@@ -1,0 +1,301 @@
+# Detailed Prompt for Workshop Attendee Management System
+
+## Overview
+Create a workshop attendee management system with a separate HTML/JS frontend and FastAPI backend. The system tracks attendee progress through workshop tasks, collects feedback surveys, and includes an admin dashboard with natural language query capabilities and an interactive "2 Truths and a Lie" game feature.
+
+## Technology Stack
+- **Frontend**: Pure HTML/JavaScript (no frameworks) - served as static files
+- **Backend**: FastAPI (Python) with REST APIs only
+- **Database**: Oracle Database (OCI Autonomous Database)
+- **Image Storage**: Local filesystem (images served via static file endpoint)
+- **NL to SQL**: LangChain + OpenAI API for natural language queries
+
+## Database Schema
+
+### Table: STUDENTS
+- STUDENT_ID: VARCHAR2(50), PRIMARY KEY
+- EMAIL_ADDRESS: VARCHAR2(255), NOT NULL, UNIQUE
+- NAME: VARCHAR2(100)
+- LOCATION: VARCHAR2(3) - location code for grouping attendees
+- MANAGER: VARCHAR2(100)
+- JOB_ID: VARCHAR2(50)
+- INTRO: VARCHAR2(1000) - introduction text
+- TL1: VARCHAR2(500) - Truth/Lie statement 1
+- TL2: VARCHAR2(500) - Truth/Lie statement 2
+- TL3: VARCHAR2(500) - Truth/Lie statement 3
+- ACK: CHAR(1) - acknowledgment flag ('Y'/'N')
+- ON_BOARDED: CHAR(1) - onboarding completion flag ('Y'/'N')
+- TF: CHAR(1) - additional flag
+- TEAM: VARCHAR2(100) - team name 
+- FACE_IMAGE             VARCHAR2(500)  
+- MAC_PC: CHAR(1) - device preference ('M'/'P')
+- IMAGE_FILENAME: VARCHAR2(255) - filename for profile image (stored on filesystem)
+- ONBOARDING_COMMENTS: CLOB - freehand comments about onboarding
+- PLAYED_2T1L: CHAR(1) DEFAULT 'N' - whether attendee has played the 2 Truths and a Lie game
+- CREATED_AT: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- UPDATED_AT: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+### Table: ONBOARDING_TASKS
+- TASK_ID: NUMBER, PRIMARY KEY (auto-increment)
+- STUDENT_ID: VARCHAR2(50), FOREIGN KEY to WORKSHOP_ATTENDEES
+- TASK_CODE: VARCHAR2(50) - unique code for each task type
+- COMPLETED: CHAR(1) DEFAULT 'N'
+- COMPLETED_AT: TIMESTAMP
+- UNIQUE constraint on (STUDENT_ID, TASK_CODE)
+
+**Task Codes**:
+- tenancy_access
+- install_uv
+- install_vscode
+- install_cline
+- install_aider
+- install_sqlcl
+- setup_oci
+- clone_repo
+- uv_sync
+- setup_env
+- run_code
+
+### Table: SURVEY_RESPONSES
+- RESPONSE_ID: NUMBER, PRIMARY KEY (auto-increment)
+- STUDENT_ID: VARCHAR2(50), FOREIGN KEY
+- SURVEY_TYPE: VARCHAR2(50) - type of survey (onboarding, llms, rag, etc.)
+- RATING: NUMBER(1) - 1-5 rating
+- WHAT_LIKED: VARCHAR2(2000)
+- WHAT_BETTER: VARCHAR2(2000)
+- COMMENTS: CLOB
+- CREATED_AT: TIMESTAMP
+
+**Survey Types**:
+- onboarding
+- llms
+- rag
+- function_calling
+- agents
+- database
+- speech
+- vision
+- demos
+- dev_productivity
+
+### Table: WORKSHOP_FEEDBACK
+- FEEDBACK_ID: NUMBER, PRIMARY KEY (auto-increment)
+- STUDENT_ID: VARCHAR2(50), FOREIGN KEY
+- OVERALL_RATING: NUMBER(1) - 1-5 rating
+- OVERALL_COMMENTS: CLOB
+- FUTURE_IDEAS: CLOB
+- CREATED_AT: TIMESTAMP
+
+## Frontend Structure (HTML/JS)
+
+### File Organization
+```
+frontend/
+├── index.html (login page)
+├── attendee.html (attendee portal)
+├── admin.html (admin dashboard)
+├── css/
+│   └── styles.css
+├── js/
+│   ├── login.js
+│   ├── attendee.js
+│   └── admin.js
+└── images/ (profile images directory)
+```
+
+### Login Page (index.html)
+- Email input field with keydown autocomplete
+- Call `/api/attendees/autocomplete?q={query}` on each keypress (after 2+ characters)
+- Display dropdown with matching email addresses
+- On login, call `/api/login` with email
+- Redirect to attendee.html or admin.html based on response
+- Include "Admin Access" button that sets isAdmin flag
+
+### Attendee Portal (attendee.html)
+Four main sections accessible via tab navigation:
+
+**1. Progress Overview**
+- Display overall progress percentage (calculated from completed sections)
+- Show completion status for:
+  - Workshop Acknowledgment
+  - Introduction
+  - Onboarding Tasks (X of 11 completed)
+  - Surveys
+
+**2. Introduction Section**
+- Checkbox: "I acknowledge participation in this workshop" (updates ACK field)
+- Text input: Team name
+- Three text inputs: 2 Truths and a Lie statements (TL1, TL2, TL3)
+- Textarea: Introduction text
+- Profile image display (read-only, served from `/api/attendees/{id}/image`)
+- Radio buttons: Mac/PC preference
+- Save button to update attendee record
+
+**3. Onboarding Checklist**
+- Display all 11 onboarding tasks as checkboxes
+- Each checkbox toggle updates ONBOARDING_TASKS table
+- Textarea for freehand comments about onboarding process
+- Save comments button
+- When all tasks completed, automatically update ON_BOARDED flag to 'Y'
+
+**4. Surveys Section**
+Two parts:
+
+**Session Surveys** (one for each topic):
+- For each of 9 session topics, display:
+  - Slider: Rating 1-5
+  - Textarea: What did you like?
+  - Textarea: What could be better?
+  - Optional: Comments
+
+**Overall Workshop Feedback**:
+- Slider: Overall rating 1-5
+- Textarea: Overall comments
+- Textarea: Ideas for future workshops
+- Submit All Surveys button
+
+### Admin Dashboard (admin.html)
+
+**1. Attendee List View**
+- Table showing all attendees with columns:
+  - Name
+  - Email
+  - Location
+  - Team
+  - Progress percentage (calculated)
+  - ACK status
+  - ON_BOARDED status
+  - Played 2T1L status
+- Click row to expand/view details
+- Export to CSV button
+
+**2. Natural Language Query Interface**
+- Text input for natural language questions
+- Submit button
+- Results display area (formatted as table or text)
+- Example queries displayed:
+  - "How many people completed onboarding?"
+  - "Show me attendees from Austin who haven't finished"
+  - "What's the average rating for the RAG session?"
+  - "List all Mac users"
+  - "Show feedback mentioning 'confusing'"
+
+**3. 2 Truths and a Lie Game**
+- Location dropdown (populate from unique LOCATION values in database)
+- "Start Game" button
+- Game flow:
+  1. Admin selects a location
+  2. System randomly selects one attendee from that location where PLAYED_2T1L = 'N'
+  3. Display attendee name and their three statements (TL1, TL2, TL3)
+  4. Display attendee's profile image
+  5. Admin can discuss/play the game with the group
+  6. "Mark as Played" button updates PLAYED_2T1L to 'Y' for that attendee
+  7. "Next Person" button selects another random unplayed attendee from same location
+  8. If all attendees from location have played, show message "All attendees from this location have played!"
+
+## Backend API Endpoints (FastAPI)
+
+### Authentication & User Management
+- `POST /api/login` - Authenticate by email, return user object
+- `GET /api/attendees/autocomplete?q={query}` - Return matching email addresses
+- `GET /api/attendees/{student_id}` - Get attendee details
+- `PUT /api/attendees/{student_id}` - Update attendee information
+- `GET /api/attendees/{student_id}/image` - Serve profile image from filesystem
+
+### Task Management
+- `GET /api/tasks/{student_id}` - Get all tasks for attendee
+- `POST /api/tasks/{student_id}` - Update task completion status
+  - Body: `{ "task_code": "install_uv", "completed": true }`
+  - Auto-update ON_BOARDED flag when all tasks completed
+
+### Surveys
+- `POST /api/surveys` - Submit session survey
+  - Body: `{ "student_id": "...", "survey_type": "llms", "rating": 4, "what_liked": "...", "what_better": "..." }`
+- `POST /api/surveys/overall` - Submit overall workshop feedback
+  - Body: `{ "student_id": "...", "overall_rating": 5, "overall_comments": "...", "future_ideas": "..." }`
+
+### Admin Endpoints
+- `GET /api/admin/attendees` - Get all attendees with calculated progress
+- `POST /api/admin/query` - Natural language query endpoint
+  - Body: `{ "query": "How many people completed onboarding?" }`
+  - Uses LangChain + OpenAI to convert NL to SQL
+  - Execute SQL (read-only) and return results
+  - Return formatted response
+- `GET /api/admin/locations` - Get list of unique locations
+- `GET /api/admin/game/next?location={code}` - Get random unplayed attendee from location
+  - Query WORKSHOP_ATTENDEES where LOCATION = code AND PLAYED_2T1L = 'N'
+  - Return random selection with name, TL1, TL2, TL3, image_filename
+  - Return empty if all have played
+- `PUT /api/admin/game/played/{student_id}` - Mark attendee as having played 2T1L game
+  - Update PLAYED_2T1L to 'Y'
+
+## Key Features & Requirements
+
+### Image Handling
+- Profile images stored in `/backend/static/images/` directory
+- Naming convention: `{student_id}.jpg` or `{student_id}.png`
+- Frontend displays images via: `/api/attendees/{student_id}/image`
+- Backend serves from filesystem using FastAPI static files
+- No upload functionality needed (images pre-loaded)
+
+### Progress Calculation
+Calculate completion percentage based on:
+- ACK = 'Y' (25%)
+- INTRO and TEAM filled (25%)
+- ON_BOARDED = 'Y' (25%)
+- At least one survey submitted (25%)
+
+### Natural Language to SQL
+- Use LangChain SQLDatabaseChain with OpenAI GPT-4
+- Provide schema context to LLM
+- Restrict to read-only SELECT queries
+- Include query validation and error handling
+- Format results as JSON with human-readable summary
+
+### 2 Truths and a Lie Game Logic
+- Filter by location to get relevant attendees
+- Only show attendees where PLAYED_2T1L = 'N'
+- Random selection using SQL ORDER BY RANDOM() or Python random.choice()
+- Display all three statements without revealing which is the lie
+- Admin manually marks as played after game concludes
+- Reset capability: Admin can reset all PLAYED_2T1L flags for a location
+
+### Security Considerations
+- Email-only authentication (no passwords for simplicity)
+- CORS configuration for local development
+- SQL injection prevention (use parameterized queries)
+- Admin access control (check isAdmin flag in session/token)
+
+### Error Handling
+- Frontend: Display user-friendly error messages
+- Backend: Return appropriate HTTP status codes (400, 404, 500)
+- Database connection error handling
+- File not found handling for images
+
+### Data Validation
+- Email format validation
+- Required fields checking before save
+- Rating values must be 1-5
+- Task codes must match predefined list
+- Location codes must exist in database
+
+## Optional Enhancements
+1. Real-time progress updates using WebSockets
+2. Export survey results to Excel
+3. Dashboard analytics charts (completion rates, average ratings)
+4. Bulk import attendees from CSV
+5. Email notifications for incomplete tasks
+6. Leaderboard for fastest onboarding completion
+7. Search/filter in admin attendee list
+8. Game history tracking (who played when)
+9. Multiple admin users with authentication
+10. Dark mode toggle
+
+## Deployment Notes
+- Frontend: Serve static files via FastAPI or separate web server (nginx)
+- Backend: Run with `uvicorn main:app --reload --port 8000`
+- Database: Connect to OCI ATP using Oracle wallet or connection string
+- Environment variables: Store in `.env` file (DB credentials, OpenAI API key, OCI config)
+- Image directory: Ensure proper permissions for read access
+
+This system provides a comprehensive workshop management solution with attendee self-service, automated progress tracking, detailed feedback collection, and powerful admin tools including AI-powered querying and an interactive icebreaker game.
