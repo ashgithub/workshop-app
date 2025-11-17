@@ -29,12 +29,13 @@ async def get_all_attendees(
     try:
         # Compute intro_completed_count: team + intro + (tl1/tl2/tl3 all filled) + mac_pc (4 fields total)
         intro_count_subquery = """
-        (CASE WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' THEN 1 ELSE 0 END +
-         CASE WHEN s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 1 ELSE 0 END +
-         CASE WHEN COALESCE(s.TL1,'') != '' AND COALESCE(s.TL2,'') != '' AND COALESCE(s.TL3,'') != '' THEN 1 ELSE 0 END +
-         CASE WHEN s.MAC_PC IS NOT NULL THEN 1 ELSE 0 END) as intro_completed_count
+        (CASE WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0 
+                AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0 
+                AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END) as intro_completed_count
         """
-
         # Base query
         base_query = """
         SELECT
@@ -43,6 +44,11 @@ async def get_all_attendees(
             s.NAME,
             s.LOCATION,
             s.TEAM,
+            s.INTRO,
+            s.TL1,
+            s.TL2,
+            s.TL3,
+            s.MAC_PC,
             s.ACK,
             s.ON_BOARDED,
             s.PLAYED_2T1L,
@@ -55,9 +61,9 @@ async def get_all_attendees(
                 ELSE 0
             END +
             CASE
-                WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' AND s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 25
+                WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 AND s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 25
                 ELSE 0
-            END +
+            END +     
             CASE
                 WHEN COALESCE(task_progress.tasks_completed, 0) = COALESCE(task_progress.tasks_total, 11) AND COALESCE(task_progress.tasks_total, 11) > 0 THEN 25
                 ELSE 0
@@ -94,9 +100,16 @@ async def get_all_attendees(
         if location:
             conditions.append("s.LOCATION = :location")
             params["location"] = location
-
+            
         if intro_lt is not None:
-            conditions.append("(CASE WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' THEN 1 ELSE 0 END + CASE WHEN s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 1 ELSE 0 END + CASE WHEN COALESCE(s.TL1,'') != '' AND COALESCE(s.TL2,'') != '' AND COALESCE(s.TL3,'') != '' THEN 1 ELSE 0 END + CASE WHEN s.MAC_PC IS NOT NULL THEN 1 ELSE 0 END) < :intro_lt")
+            conditions.append("""(
+                CASE WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 THEN 1 ELSE 0 END +
+                CASE WHEN s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 1 ELSE 0 END +
+                CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0 
+                        AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0 
+                        AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
+                CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END
+            ) < :intro_lt""")
             params["intro_lt"] = intro_lt
 
         if onboarding_lt is not None:
@@ -145,21 +158,38 @@ async def get_all_attendees(
 
         attendees = []
         for row in result:
+            # DEBUG: Now using correct field order for intro fields!
+            if row[1] == 'vineet.bedi@oracle.com':
+                logging.warning(
+                    f"[DEBUG] vineet.bedi@oracle.com - TEAM:{row[4]!r} INTRO:{row[5]!r} TL1:{row[6]!r} TL2:{row[7]!r} TL3:{row[8]!r} MAC_PC:{row[9]!r} "
+                    f"INTRO_COMPLETED_COUNT:{row[16]!r} TASKS:{row[13]!r}/{row[14]!r} SURVEYS:{row[15]!r}/11"
+                )
+            # Dump all other users only if total intro_completed_count or surveys/tasks is nonzero (for summary analysis)
+            if row[16] != 0 or row[13] != 0 or row[15] != 0:
+                logging.warning(
+                    f"[DEBUG] TOTALS - EMAIL:{row[1]!r} TEAM:{row[4]!r} INTRO:{row[5]!r} TL1:{row[6]!r} TL2:{row[7]!r} TL3:{row[8]!r} MAC_PC:{row[9]!r} "
+                    f"INTRO_COMPLETED_COUNT:{row[16]!r} TASKS:{row[13]!r}/{row[14]!r} SURVEYS:{row[15]!r}/11"
+                )
             attendee = {
                 "student_id": row[0],
                 "email_address": row[1],
                 "name": row[2],
                 "location": row[3],
                 "team": row[4],
-                "ack": row[5],
-                "on_boarded": row[6],
-                "played_2t1l": row[7],
-                "tasks_completed": row[8],
-                "tasks_total": row[9],
-                "surveys_completed": row[10],
+                "intro": row[5],
+                "tl1": row[6],
+                "tl2": row[7],
+                "tl3": row[8],
+                "mac_pc": row[9],
+                "ack": row[10],
+                "on_boarded": row[11],
+                "played_2t1l": row[12],
+                "tasks_completed": row[13],
+                "tasks_total": row[14],
+                "surveys_completed": row[15],
                 "surveys_total": 11,
-                "intro_completed_count": row[11],
-                "overall_progress": row[12]
+                "intro_completed_count": row[16],
+                "overall_progress": row[17]
             }
             attendees.append(attendee)
 
