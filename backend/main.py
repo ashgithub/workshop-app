@@ -24,6 +24,13 @@ except ImportError as e:
     print(f"Failed to import auth router: {e}")
     auth_router = None
 
+try:
+    from backend.routers.attendees import router as attendees_router
+    print("Attendees router imported successfully")
+except ImportError as e:
+    print(f"Failed to import attendees router: {e}")
+    attendees_router = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,6 +88,12 @@ if auth_router:
     print("Auth router registered successfully")
 else:
     print("Auth router not available")
+
+if attendees_router:
+    app.include_router(attendees_router, prefix="/api/attendees", tags=["attendees"])
+    print("Attendees router registered successfully")
+else:
+    print("Attendees router not available")
 
 
 # Mount static files (after API routes to avoid conflicts)

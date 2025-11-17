@@ -49,8 +49,6 @@ class StudentUpdate(BaseModel):
 
 class Student(StudentBase):
     student_id: str
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -75,7 +73,6 @@ class Task(BaseModel):
     student_id: str
     task_code: str
     completed: str
-    completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

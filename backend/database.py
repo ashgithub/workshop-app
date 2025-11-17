@@ -70,7 +70,7 @@ class DatabaseConnection:
                     return cursor.fetchall()
                 return None
 
-    def execute_dml(self, query: str, params: Optional[tuple] = None) -> int:
+    def execute_dml(self, query: str, params: Optional[tuple | dict] = None) -> int:
         """Execute INSERT, UPDATE, DELETE queries."""
         with self.get_connection() as conn:
             with conn.cursor() as cursor:

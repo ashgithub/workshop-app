@@ -23,6 +23,10 @@
 - ✅ Fixed autocomplete positioning (below input field)
 - ✅ Created placeholder HTML pages for all routes
 - ✅ Tabbed interface for attendee and admin dashboards
+- ✅ Database schema reconciliation (added missing columns)
+- ✅ Attendee profile display with names and images
+- ✅ User introduction form with onboarding comments
+- ✅ API error resolution (500 errors fixed)
 
 ---
 
@@ -83,7 +87,18 @@
 
 ---
 
-## Phase 4: Advanced Features
+## Phase 4: Advanced Features 🚧 IN PROGRESS
+
+### Task Management System
+#### `ONBOARDING_TASKS Table Creation`
+- **DDL**: Create table for tracking 11 onboarding tasks per attendee
+- **Task Codes**: tenancy_access, install_uv, install_vscode, install_cline, install_aider, install_sqlcl, setup_oci, clone_repo, uv_sync, setup_env, run_code
+- **API Endpoints**: GET/PUT task completion status
+
+#### `Progress Calculation Enhancement`
+- **Current Issue**: Progress calculation fails due to missing ONBOARDING_TASKS table
+- **Solution**: Update progress calculation to work with/without tasks table
+- **Logic**: ACK (25%) + INTRO/TEAM (25%) + ON_BOARDED (25%) + Surveys (25%)
 
 ### Natural Language to SQL
 #### `POST /api/admin/query`
@@ -110,11 +125,7 @@
 #### `GET /api/admin/attendees`
 - **Purpose**: Get all attendees with calculated progress
 - **SQL**: Complex query joining STUDENTS + task counts + survey counts
-- **Progress Calculation**:
-  - ACK = 'Y' (25%)
-  - INTRO and TEAM filled (25%)
-  - ON_BOARDED = 'Y' (25%)
-  - At least one survey submitted (25%)
+- **Progress Calculation**: Enhanced with task completion tracking
 
 ---
 

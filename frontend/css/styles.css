@@ -24,10 +24,10 @@ body {
 .login-section {
     background: white;
     border-radius: 12px;
-    padding: 40px;
+    padding: 60px 40px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     text-align: center;
-    max-width: 400px;
+    max-width: 450px;
     margin: 0 auto;
     position: relative;
 }
@@ -197,10 +197,53 @@ input[type="email"]:focus {
 .attendee-portal, .admin-dashboard {
     background: white;
     border-radius: 12px;
-    padding: 40px;
+    padding: 60px 50px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    max-width: 1000px;
+    max-width: 1100px;
     margin: 0 auto;
+    min-height: 600px;
+}
+
+.attendee-profile {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.profile-image {
+    flex-shrink: 0;
+}
+
+.profile-image img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #667eea;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 2.2rem;
+}
+
+.profile-info p {
+    margin: 5px 0;
+    color: #666;
+    font-size: 1rem;
+}
+
+.attendee-portal h2, .admin-dashboard h2 {
+    color: #334155;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
 }
 
 .query-form {
@@ -235,7 +278,182 @@ input[type="email"]:focus {
     font-size: 16px;
 }
 
+/* Form styling */
+.introduction-form, .feedback-form {
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Radio buttons */
+.form-group label input[type="radio"] {
+    margin-right: 8px;
+    margin-left: 16px;
+}
+
+.form-group label:first-child input[type="radio"] {
+    margin-left: 0;
+}
+
+/* Checkboxes */
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+    transform: scale(1.2);
+}
+
+/* Progress summary */
+.progress-summary {
+    margin: 20px 0;
+}
+
+.progress-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.progress-item:last-child {
+    border-bottom: none;
+}
+
+.progress-label {
+    font-weight: 500;
+    color: #555;
+}
+
+.progress-status.completed {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.progress-status.pending {
+    color: #f59e0b;
+    font-weight: 500;
+}
+
+/* Tasks list */
+.tasks-list {
+    margin: 20px 0;
+}
+
+.task-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.task-item:last-child {
+    border-bottom: none;
+}
+
+.task-item input[type="checkbox"] {
+    margin-right: 12px;
+    transform: scale(1.2);
+}
+
+.task-item label {
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+}
+
+/* Survey sections */
+.survey-sections {
+    display: grid;
+    gap: 30px;
+    margin: 20px 0;
+}
+
+.survey-section {
+    background: #f8fafc;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.survey-section h3 {
+    margin-bottom: 15px;
+    color: #334155;
+}
+
+.session-surveys {
+    display: grid;
+    gap: 15px;
+}
+
+.survey-item {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #e1e5e9;
+}
+
+.survey-item h4 {
+    margin-bottom: 10px;
+    color: #475569;
+}
+
 /* Responsive design */
+@media (max-width: 768px) {
+    .attendee-portal, .admin-dashboard {
+        padding: 30px 20px;
+    }
+
+    .progress-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .task-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .survey-sections {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 480px) {
     .login-section {
         padding: 30px 20px;
@@ -261,5 +479,9 @@ input[type="email"]:focus {
 
     .attendee-portal, .admin-dashboard {
         padding: 20px;
+    }
+
+    .introduction-form, .feedback-form {
+        max-width: 100%;
     }
 }

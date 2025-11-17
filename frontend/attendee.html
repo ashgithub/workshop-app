@@ -9,9 +9,16 @@
 <body>
     <div class="container">
         <div class="attendee-portal">
-            <h1>Workshop Attendee Portal</h1>
-            <p>Welcome to your workshop dashboard!</p>
-            <p>Student ID: <span id="student-id"></span></p>
+            <div class="attendee-profile">
+                <div class="profile-image">
+                    <img id="profile-img" src="" alt="Profile Photo" onerror="this.src='/static/default-avatar.png'">
+                </div>
+                <div class="profile-info">
+                    <h1 id="attendee-name">Welcome!</h1>
+                    <p>Student ID: <span id="student-id"></span></p>
+                    <p id="attendee-email"></p>
+                </div>
+            </div>
 
             <div class="tabs">
                 <button class="tab-btn active" data-tab="progress">Progress Overview</button>
