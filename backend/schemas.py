@@ -121,12 +121,23 @@ class WorkshopFeedback(WorkshopFeedbackBase):
 
 
 # Progress and summary schemas
+class IntroProgress(BaseModel):
+    team_completed: bool
+    intro_completed: bool
+    truths_completed: bool
+    device_completed: bool
+
 class ProgressInfo(BaseModel):
     ack_completed: bool
     intro_completed: bool
+    intro_fields_completed: int
+    intro_fields_total: int
+    intro_details: IntroProgress
     tasks_completed: int
     tasks_total: int
     surveys_submitted: bool
+    surveys_completed: int
+    surveys_total: int
     overall_progress: int  # percentage
 
 

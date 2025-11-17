@@ -1,0 +1,303 @@
+"""
+Admin router for administrative functions including NL to SQL queries and game management.
+"""
+from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+import logging
+import os
+
+from ..database import db
+from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+@router.get("/attendees")
+async def get_all_attendees():
+    """
+    Get all attendees with calculated progress for admin dashboard.
+    """
+    try:
+        # Complex query to get all attendees with progress
+        query = """
+        SELECT
+            s.STUDENT_ID,
+            s.EMAIL_ADDRESS,
+            s.NAME,
+            s.LOCATION,
+            s.TEAM,
+            s.ACK,
+            s.ON_BOARDED,
+            s.PLAYED_2T1L,
+            COALESCE(task_progress.tasks_completed, 0) as tasks_completed,
+            COALESCE(task_progress.tasks_total, 11) as tasks_total,
+            CASE
+                WHEN s.ACK = 'Y' THEN 25
+                ELSE 0
+            END +
+            CASE
+                WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' AND s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 25
+                ELSE 0
+            END +
+            CASE
+                WHEN COALESCE(task_progress.tasks_completed, 0) = COALESCE(task_progress.tasks_total, 11) AND COALESCE(task_progress.tasks_total, 11) > 0 THEN 25
+                ELSE 0
+            END +
+            CASE
+                WHEN survey_count.survey_count > 0 THEN 25
+                ELSE 0
+            END as overall_progress
+        FROM STUDENTS s
+        LEFT JOIN (
+            SELECT
+                STUDENT_ID,
+                COUNT(*) as tasks_total,
+                COUNT(CASE WHEN COMPLETED = 'Y' THEN 1 END) as tasks_completed
+            FROM ONBOARDING_TASKS
+            GROUP BY STUDENT_ID
+        ) task_progress ON s.STUDENT_ID = task_progress.STUDENT_ID
+        LEFT JOIN (
+            SELECT STUDENT_ID, COUNT(*) as survey_count
+            FROM SURVEY_RESPONSES
+            GROUP BY STUDENT_ID
+        ) survey_count ON s.STUDENT_ID = survey_count.STUDENT_ID
+        ORDER BY s.NAME, s.EMAIL_ADDRESS
+        """
+
+        result = db.execute_query(query)
+
+        if not result:
+            return []
+
+        attendees = []
+        for row in result:
+            attendee = {
+                "student_id": row[0],
+                "email_address": row[1],
+                "name": row[2],
+                "location": row[3],
+                "team": row[4],
+                "ack": row[5],
+                "on_boarded": row[6],
+                "played_2t1l": row[7],
+                "tasks_completed": row[8],
+                "tasks_total": row[9],
+                "overall_progress": row[10]
+            }
+            attendees.append(attendee)
+
+        return attendees
+
+    except Exception as e:
+        logger.error(f"Error getting attendees: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/query", response_model=AdminQueryResponse)
+async def execute_natural_language_query(query_request: AdminQueryRequest):
+    """
+    Execute natural language query converted to SQL.
+    For now, return a placeholder response - full NL to SQL implementation would require LangChain setup.
+    """
+    try:
+        # Placeholder implementation - in full implementation, this would:
+        # 1. Use LangChain with OpenAI to convert NL to SQL
+        # 2. Validate the generated SQL is read-only
+        # 3. Execute the query safely
+
+        query = query_request.query.lower()
+
+        # Simple keyword-based responses for common queries
+        if "completed onboarding" in query or "onboarding completed" in query:
+            result = db.execute_query("""
+                SELECT COUNT(*) as completed_count
+                FROM STUDENTS
+                WHERE ON_BOARDED = 'Y'
+            """)
+            count = result[0][0] if result else 0
+            return AdminQueryResponse(
+                query=query_request.query,
+                results=[{"completed_onboarding": count}],
+                summary=f"{count} attendees have completed onboarding"
+            )
+
+        elif "location" in query and "haven't finished" in query:
+            # Extract location from query - simplified
+            location = None
+            if "austin" in query.lower():
+                location = "AUS"
+            elif "seattle" in query.lower():
+                location = "SEA"
+            # Add more location mappings as needed
+
+            if location:
+                result = db.execute_query("""
+                    SELECT COUNT(*) as incomplete_count
+                    FROM STUDENTS s
+                    LEFT JOIN (
+                        SELECT STUDENT_ID, COUNT(CASE WHEN COMPLETED = 'Y' THEN 1 END) as completed_tasks
+                        FROM ONBOARDING_TASKS
+                        GROUP BY STUDENT_ID
+                    ) t ON s.STUDENT_ID = t.STUDENT_ID
+                    WHERE s.LOCATION = :location
+                    AND (s.ON_BOARDED != 'Y' OR s.ON_BOARDED IS NULL)
+                """, {"location": location})
+                count = result[0][0] if result else 0
+                return AdminQueryResponse(
+                    query=query_request.query,
+                    results=[{"incomplete_from_location": count}],
+                    summary=f"{count} attendees from {location} haven't finished onboarding"
+                )
+
+        elif "average rating" in query and "rag" in query.lower():
+            result = db.execute_query("""
+                SELECT ROUND(AVG(RATING), 1) as avg_rating, COUNT(*) as response_count
+                FROM SURVEY_RESPONSES
+                WHERE SURVEY_TYPE = 'rag'
+            """)
+            if result and result[0][0]:
+                avg_rating = result[0][0]
+                count = result[0][1]
+                return AdminQueryResponse(
+                    query=query_request.query,
+                    results=[{"average_rating": float(avg_rating), "responses": count}],
+                    summary=f"Average RAG session rating: {avg_rating}/5 from {count} responses"
+                )
+
+        elif "mac users" in query.lower():
+            result = db.execute_query("""
+                SELECT COUNT(*) as mac_users
+                FROM STUDENTS
+                WHERE MAC_PC = 'M'
+            """)
+            count = result[0][0] if result else 0
+            return AdminQueryResponse(
+                query=query_request.query,
+                results=[{"mac_users": count}],
+                summary=f"{count} attendees are Mac users"
+            )
+
+        elif "feedback mentioning" in query and "confusing" in query.lower():
+            result = db.execute_query("""
+                SELECT COUNT(*) as confusing_mentions
+                FROM (
+                    SELECT WHAT_BETTER FROM SURVEY_RESPONSES WHERE LOWER(WHAT_BETTER) LIKE '%confusing%'
+                    UNION ALL
+                    SELECT COMMENTS FROM SURVEY_RESPONSES WHERE LOWER(COMMENTS) LIKE '%confusing%'
+                    UNION ALL
+                    SELECT OVERALL_COMMENTS FROM WORKSHOP_FEEDBACK WHERE LOWER(OVERALL_COMMENTS) LIKE '%confusing%'
+                )
+            """)
+            count = result[0][0] if result else 0
+            return AdminQueryResponse(
+                query=query_request.query,
+                results=[{"confusing_mentions": count}],
+                summary=f"{count} feedback responses mention 'confusing'"
+            )
+
+        # Default response for unrecognized queries
+        return AdminQueryResponse(
+            query=query_request.query,
+            results=[],
+            summary="Query not recognized. Try queries like 'How many people completed onboarding?' or 'Show me attendees from Austin who haven't finished'"
+        )
+
+    except Exception as e:
+        logger.error(f"Error executing query '{query_request.query}': {e}")
+        raise HTTPException(status_code=500, detail="Query execution failed")
+
+
+@router.get("/locations")
+async def get_locations():
+    """
+    Get list of unique locations for the game dropdown.
+    """
+    try:
+        result = db.execute_query("""
+            SELECT DISTINCT LOCATION
+            FROM STUDENTS
+            WHERE LOCATION IS NOT NULL
+            ORDER BY LOCATION
+        """)
+
+        locations = [row[0] for row in result] if result else []
+        return {"locations": locations}
+
+    except Exception as e:
+        logger.error(f"Error getting locations: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/game/next")
+async def get_next_game_attendee(location: Optional[str] = None):
+    """
+    Get random unplayed attendee from specified location for 2 Truths and a Lie game.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required")
+
+        # Get random attendee who hasn't played
+        result = db.execute_query("""
+            SELECT STUDENT_ID, NAME, TL1, TL2, TL3, FACE_IMAGE
+            FROM STUDENTS
+            WHERE LOCATION = :location
+            AND (PLAYED_2T1L IS NULL OR PLAYED_2T1L = 'N')
+            AND TL1 IS NOT NULL AND TL2 IS NOT NULL AND TL3 IS NOT NULL
+            ORDER BY DBMS_RANDOM.VALUE
+            FETCH FIRST 1 ROW ONLY
+        """, {"location": location})
+
+        if not result:
+            return {"attendee": None, "message": f"All attendees from {location} have played"}
+
+        row = result[0]
+        attendee = {
+            "student_id": row[0],
+            "name": row[1],
+            "tl1": row[2],
+            "tl2": row[3],
+            "tl3": row[4],
+            "image_filename": row[5]
+        }
+
+        return {"attendee": attendee}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting next game attendee for location {location}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/played/{student_id}")
+async def mark_attendee_as_played(student_id: str):
+    """
+    Mark attendee as having played the 2 Truths and a Lie game.
+    """
+    try:
+        # Check if student exists
+        student_check = db.execute_query(
+            "SELECT STUDENT_ID FROM STUDENTS WHERE STUDENT_ID = :id",
+            {"id": student_id}
+        )
+        if not student_check:
+            raise HTTPException(status_code=404, detail="Attendee not found")
+
+        # Update played status
+        affected_rows = db.execute_dml(
+            "UPDATE STUDENTS SET PLAYED_2T1L = 'Y' WHERE STUDENT_ID = :student_id",
+            {"student_id": student_id}
+        )
+
+        if affected_rows == 0:
+            raise HTTPException(status_code=404, detail="Attendee not found")
+
+        return {"message": "Attendee marked as played"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking attendee {student_id} as played: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

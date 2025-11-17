@@ -21,12 +21,25 @@ def calculate_progress(student_id: str) -> dict:
         ack_result = db.execute_query(ack_query, {"id": student_id})
         ack_completed = ack_result and ack_result[0][0] == 'Y'
 
-        # Check intro completion (TEAM and INTRO filled)
-        intro_query = "SELECT TEAM, INTRO FROM STUDENTS WHERE STUDENT_ID = :id"
+        # Check intro completion (TEAM, INTRO, TL1, TL2, TL3, MAC_PC filled)
+        intro_query = "SELECT TEAM, INTRO, TL1, TL2, TL3, MAC_PC FROM STUDENTS WHERE STUDENT_ID = :id"
         intro_result = db.execute_query(intro_query, {"id": student_id})
-        intro_completed = (intro_result and
-                          intro_result[0][0] and intro_result[0][0].strip() and
-                          intro_result[0][1] and intro_result[0][1].strip())
+
+        # Individual field completions
+        team_completed = bool(intro_result and intro_result[0][0] and intro_result[0][0].strip())
+        intro_text_completed = bool(intro_result and intro_result[0][1] and intro_result[0][1].strip())
+        truths_completed = bool(intro_result and
+                               intro_result[0][2] and intro_result[0][2].strip() and
+                               intro_result[0][3] and intro_result[0][3].strip() and
+                               intro_result[0][4] and intro_result[0][4].strip())
+        device_completed = bool(intro_result and intro_result[0][5] and intro_result[0][5].strip())
+
+        # Count completed intro fields
+        intro_fields_completed = sum([team_completed, intro_text_completed, truths_completed, device_completed])
+        intro_fields_total = 4
+
+        # Overall intro completion
+        intro_completed = intro_fields_completed == intro_fields_total
 
         # Check onboarding completion
         onboard_query = "SELECT COUNT(*) FROM ONBOARDING_TASKS WHERE STUDENT_ID = :id AND COMPLETED = 'Y'"
@@ -34,10 +47,18 @@ def calculate_progress(student_id: str) -> dict:
         tasks_completed = onboard_result[0][0] if onboard_result else 0
         tasks_total = 11  # Based on the task codes in requirements
 
-        # Check survey completion
-        survey_query = "SELECT COUNT(*) FROM SURVEY_RESPONSES WHERE STUDENT_ID = :id"
-        survey_result = db.execute_query(survey_query, {"id": student_id})
-        surveys_completed = survey_result[0][0] if survey_result else 0
+        # Check individual survey completion
+        survey_types = ['onboarding', 'llms', 'rag', 'function_calling', 'agents', 'database', 'speech', 'vision', 'demos', 'dev_productivity']
+        individual_surveys = {}
+        for survey_type in survey_types:
+            survey_check = db.execute_query(
+                "SELECT COUNT(*) FROM SURVEY_RESPONSES WHERE STUDENT_ID = :id AND SURVEY_TYPE = :type",
+                {"id": student_id, "type": survey_type}
+            )
+            individual_surveys[survey_type] = (survey_check and survey_check[0][0] > 0)
+
+        # Overall survey completion (at least one survey submitted)
+        surveys_completed = sum(individual_surveys.values())
 
         # Calculate overall progress (25% each for ACK, intro, onboarding, surveys)
         progress_score = 0
@@ -53,9 +74,19 @@ def calculate_progress(student_id: str) -> dict:
         return {
             "ack_completed": ack_completed,
             "intro_completed": intro_completed,
+            "intro_fields_completed": intro_fields_completed,
+            "intro_fields_total": intro_fields_total,
+            "intro_details": {
+                "team_completed": team_completed,
+                "intro_completed": intro_text_completed,
+                "truths_completed": truths_completed,
+                "device_completed": device_completed
+            },
             "tasks_completed": tasks_completed,
             "tasks_total": tasks_total,
             "surveys_submitted": surveys_completed > 0,
+            "surveys_completed": surveys_completed,
+            "surveys_total": len(survey_types),
             "overall_progress": progress_score
         }
 
@@ -64,9 +95,19 @@ def calculate_progress(student_id: str) -> dict:
         return {
             "ack_completed": False,
             "intro_completed": False,
+            "intro_fields_completed": 0,
+            "intro_fields_total": 4,
+            "intro_details": {
+                "team_completed": False,
+                "intro_completed": False,
+                "truths_completed": False,
+                "device_completed": False
+            },
             "tasks_completed": 0,
             "tasks_total": 11,
             "surveys_submitted": False,
+            "surveys_completed": 0,
+            "surveys_total": 10,
             "overall_progress": 0
         }
 
@@ -107,9 +148,19 @@ async def get_attendee(student_id: str):
             progress = {
                 "ack_completed": False,
                 "intro_completed": False,
+                "intro_fields_completed": 0,
+                "intro_fields_total": 4,
+                "intro_details": {
+                    "team_completed": False,
+                    "intro_completed": False,
+                    "truths_completed": False,
+                    "device_completed": False
+                },
                 "tasks_completed": 0,
                 "tasks_total": 0,
                 "surveys_submitted": False,
+                "surveys_completed": 0,
+                "surveys_total": 10,
                 "overall_progress": 100  # Admin is always "complete"
             }
 

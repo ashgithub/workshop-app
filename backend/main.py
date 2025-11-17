@@ -31,6 +31,27 @@ except ImportError as e:
     print(f"Failed to import attendees router: {e}")
     attendees_router = None
 
+try:
+    from backend.routers.tasks import router as tasks_router
+    print("Tasks router imported successfully")
+except ImportError as e:
+    print(f"Failed to import tasks router: {e}")
+    tasks_router = None
+
+try:
+    from backend.routers.surveys import router as surveys_router
+    print("Surveys router imported successfully")
+except ImportError as e:
+    print(f"Failed to import surveys router: {e}")
+    surveys_router = None
+
+try:
+    from backend.routers.admin import router as admin_router
+    print("Admin router imported successfully")
+except ImportError as e:
+    print(f"Failed to import admin router: {e}")
+    admin_router = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,6 +62,12 @@ async def lifespan(app: FastAPI):
     # Test database connection
     if db.test_connection():
         print("Database connection successful")
+
+        # Initialize database schema if needed
+        if db.initialize_schema():
+            print("Database schema initialized successfully")
+        else:
+            print("Warning: Database schema initialization failed - some features may not work")
     else:
         print("Warning: Database connection failed - some features may not work")
 
@@ -94,6 +121,24 @@ if attendees_router:
     print("Attendees router registered successfully")
 else:
     print("Attendees router not available")
+
+if tasks_router:
+    app.include_router(tasks_router, prefix="/api/tasks", tags=["tasks"])
+    print("Tasks router registered successfully")
+else:
+    print("Tasks router not available")
+
+if surveys_router:
+    app.include_router(surveys_router, prefix="/api/surveys", tags=["surveys"])
+    print("Surveys router registered successfully")
+else:
+    print("Surveys router not available")
+
+if admin_router:
+    app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+    print("Admin router registered successfully")
+else:
+    print("Admin router not available")
 
 
 # Mount static files (after API routes to avoid conflicts)

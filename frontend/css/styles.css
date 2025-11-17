@@ -395,6 +395,129 @@ input[type="email"]:focus {
     cursor: pointer;
 }
 
+/* Survey tabs */
+.survey-tabs {
+    margin: 20px 0;
+    border-bottom: 2px solid #e1e5e9;
+}
+
+.survey-tab-content {
+    display: none;
+}
+
+.survey-tab-content.active {
+    display: block;
+}
+
+.tab-buttons {
+    display: flex;
+    overflow-x: auto;
+    gap: 2px;
+}
+
+.survey-tab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 8px;
+    border: none;
+    background: #f8f9fa;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    min-width: 80px;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.survey-tab-btn.active {
+    background: white;
+    border-bottom-color: #667eea;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.survey-tab-btn:hover:not(.active) {
+    background: #e9ecef;
+}
+
+.tab-status {
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.tab-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
+    text-align: center;
+}
+
+.survey-tab-btn.active .tab-name {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.tab-content-container {
+    background: white;
+    border-radius: 0 8px 8px 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Survey forms */
+.survey-form h3 {
+    color: #334155;
+    margin-bottom: 20px;
+    font-size: 1.4rem;
+}
+
+.rating-section {
+    margin-bottom: 20px;
+}
+
+.rating-section label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.emoji-rating {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.emoji-btn {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 24px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.emoji-btn.selected {
+    border-color: #667eea;
+    background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.selected-rating {
+    font-size: 14px;
+    color: #6b7280;
+    font-style: italic;
+}
+
 /* Survey sections */
 .survey-sections {
     display: grid;
