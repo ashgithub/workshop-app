@@ -178,11 +178,13 @@ async def get_attendee(student_id: str):
 
         # Get student data from database - all columns now exist
         query = """
-        SELECT STUDENT_ID, EMAIL_ADDRESS, NAME, LOCATION, MANAGER, JOB_ID,
-               INTRO, TL1, TL2, TL3, ACK, ON_BOARDED, TF, TEAM, FACE_IMAGE,
-               MAC_PC, ONBOARDING_COMMENTS, PLAYED_2T1L, CREATED_AT, UPDATED_AT
-        FROM STUDENTS
-        WHERE STUDENT_ID = :student_id
+        SELECT s.STUDENT_ID, s.EMAIL_ADDRESS, s.NAME, s.LOCATION, s.MANAGER, s.JOB_ID,
+               s.INTRO, s.TL1, s.TL2, s.TL3, s.ACK, s.ON_BOARDED, s.TF, s.TEAM, s.FACE_IMAGE,
+               s.MAC_PC, s.ONBOARDING_COMMENTS, s.PLAYED_2T1L, s.CREATED_AT, s.UPDATED_AT,
+               l.CODE, l.NAME AS LOCATION_NAME, l.ROOM, l.MEETING_TIME, l.AGENDA_IMAGE_PATH
+        FROM STUDENTS s
+        LEFT JOIN LOCATIONS l ON s.LOCATION = l.CODE
+        WHERE s.STUDENT_ID = :student_id
         """
 
         result = db.execute_query(query, {"student_id": student_id})
@@ -215,6 +217,19 @@ async def get_attendee(student_id: str):
             "created_at": row[18],
             "updated_at": row[19]
         }
+
+        # Add location details if available
+        location_code = row[20]
+        if location_code:
+            student_data["location"] = {
+                "code": location_code,
+                "name": row[21] or "Unknown",
+                "room": row[22] or "TBD",
+                "meeting_time": row[23] or "TBD",
+                "agenda_image_path": row[24] or ""
+            }
+        else:
+            student_data["location"] = None
 
         # Calculate progress
         progress = calculate_progress(student_id)

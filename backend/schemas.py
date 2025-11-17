@@ -146,8 +146,20 @@ class ProgressInfo(BaseModel):
     overall_progress: int  # percentage
 
 
+class Location(BaseModel):
+    code: str = Field(..., max_length=3)
+    name: str
+    room: str
+    meeting_time: str
+    agenda_image_path: str
+
+    class Config:
+        from_attributes = True
+
+
 class StudentWithProgress(Student):
     progress: ProgressInfo
+    location: Optional[Location] = None
 
 
 # Authentication schemas

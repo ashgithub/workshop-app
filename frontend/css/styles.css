@@ -247,6 +247,22 @@ input[type="email"]:focus {
     font-size: 1rem;
 }
 
+#location-details p {
+    margin: 8px 0;
+    font-weight: 500;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.agenda-image {
+    max-width: 100%;
+    height: auto;
+    margin-top: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
 .attendee-portal h2, .admin-dashboard h2 {
     color: #334155;
     margin-bottom: 20px;

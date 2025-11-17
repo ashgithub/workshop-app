@@ -733,6 +733,21 @@ function updateAttendeeProfile(attendee) {
         emailElement.textContent = attendee.email_address;
     }
 
+    // Update location details and agenda image
+    const locationDetails = document.getElementById('location-details');
+    const agendaImg = document.getElementById('agenda-img');
+    if (attendee.location) {
+        locationDetails.innerHTML = `
+            <p>Location: ${attendee.location.name} - [${attendee.location.room}]</p>
+            <p>Meeting Time: ${attendee.location.meeting_time}</p>
+        `;
+        agendaImg.src = attendee.location.agenda_image_path;
+        agendaImg.style.display = 'block';
+    } else {
+        locationDetails.innerHTML = '<p>Location: TBD</p>';
+        agendaImg.style.display = 'none';
+    }
+
     // Update profile image
     const imgElement = document.getElementById('profile-img');
     if (imgElement && attendee.image_filename) {
