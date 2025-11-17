@@ -160,10 +160,11 @@ if frontend_path.exists():
                 # Inject proxy config into HTML
                 html_content = response.body.decode('utf-8')
                 proxy_config_script = f"""
-        window.PROXY_CONFIG = {{
-            enabled: {str(config.proxy_enabled).lower()},
-            bearerToken: "{config.proxy_bearer_token}"
-        }};
+window.PROXY_CONFIG = {{
+    enabled: {str(config.proxy_enabled).lower()},
+    bearerToken: "{config.proxy_bearer_token}",
+    basePath: "{config.proxy_prefix}"
+}};
                 """
                 html_content = html_content.replace(
                     'window.PROXY_CONFIG = {',
