@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -79,12 +79,13 @@ async def lifespan(app: FastAPI):
     print("Shutting down Workshop Survey API...")
 
 
-# Create FastAPI app
+# Create FastAPI app with conditional root_path for proxy support
 app = FastAPI(
     title="Workshop Survey API",
     description="API for workshop attendee management system",
     version="1.0.0",
     debug=config.debug,
+    root_path=config.proxy_prefix if config.proxy_enabled else "",
     lifespan=lifespan
 )
 
@@ -146,10 +147,33 @@ static_path = Path(config.static_dir)
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
 
-# Mount frontend files (must be last)
+# Mount frontend files (must be last) with conditional config injection
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+    from fastapi.responses import HTMLResponse
+
+    # Custom static files handler to inject proxy config
+    class ConfigInjectingStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope):
+            response = await super().get_response(path, scope)
+            if path.endswith('.html') and hasattr(response, 'body'):
+                # Inject proxy config into HTML
+                html_content = response.body.decode('utf-8')
+                proxy_config_script = f"""
+        window.PROXY_CONFIG = {{
+            enabled: {str(config.proxy_enabled).lower()},
+            bearerToken: "{config.proxy_bearer_token}"
+        }};
+                """
+                html_content = html_content.replace(
+                    'window.PROXY_CONFIG = {',
+                    proxy_config_script.strip()
+                )
+                response.body = html_content.encode('utf-8')
+                response.headers['content-length'] = str(len(response.body))
+            return response
+
+    app.mount("/", ConfigInjectingStaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 # Export app for uvicorn
 __all__ = ["app"]

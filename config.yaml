@@ -13,3 +13,8 @@ openai:
 app:
   debug: $DEBUG:false  # Set to true for development
   secret_key:  $SECRET_KEY:your-secret-key-change-in-production
+
+proxy:
+  enabled: false  # Set to true when running behind nginx proxy
+  prefix: ""  # URL prefix when behind proxy (e.g., "/workshop-app")
+  bearer_token: ""  # Bearer token required for proxy authentication

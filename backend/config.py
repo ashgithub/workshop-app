@@ -32,12 +32,6 @@ class Config:
             }
 
     @property
-    def oracle_wallet_pass(self) -> str:
-        return self._config.get('database', {}).get('wallet_pass', '')
-    @property
-    def oracle_wallet(self) -> str:
-        return self._config.get('database', {}).get('wallet', '')
-    @property
     def oracle_user(self) -> str:
         return self._config.get('database', {}).get('user', '')
 
@@ -72,6 +66,18 @@ class Config:
     @property
     def secret_key(self) -> str:
         return self._config.get('app', {}).get('secret_key', 'your-secret-key-change-in-production')
+
+    @property
+    def proxy_enabled(self) -> bool:
+        return self._config.get('proxy', {}).get('enabled', False)
+
+    @property
+    def proxy_prefix(self) -> str:
+        return self._config.get('proxy', {}).get('prefix', '')
+
+    @property
+    def proxy_bearer_token(self) -> str:
+        return self._config.get('proxy', {}).get('bearer_token', '')
 
     @property
     def static_dir(self) -> str:
