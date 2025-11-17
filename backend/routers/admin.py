@@ -1,7 +1,7 @@
 """
 Admin router for administrative functions including NL to SQL queries and game management.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import logging
 import os
@@ -14,13 +14,29 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/attendees")
-async def get_all_attendees():
+async def get_all_attendees(
+    location: Optional[str] = Query(None, description="Filter by location (e.g., AUS)"),
+    intro_lt: Optional[int] = Query(None, description="Filter attendees with intro completed count < x"),
+    onboarding_lt: Optional[int] = Query(None, description="Filter attendees with onboarding tasks completed < x"),
+    survey_lt: Optional[int] = Query(None, description="Filter attendees with surveys completed < x"),
+    ack_filter: Optional[str] = Query(None, regex="^(Y|N|any)$", description="Filter by ACK (Y, N, or any)"),
+    sort_by: Optional[str] = Query("name", description="Sort by field: name, location, overall_progress, intro_completed, onboarding_completed, surveys_completed"),
+    order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order: asc or desc")
+):
     """
-    Get all attendees with calculated progress for admin dashboard.
+    Get all attendees with calculated progress for admin dashboard, supporting filters and sorting.
     """
     try:
-        # Complex query to get all attendees with progress
-        query = """
+        # Compute intro_completed_count: team + intro + (tl1/tl2/tl3 all filled) + mac_pc (4 fields total)
+        intro_count_subquery = """
+        (CASE WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' THEN 1 ELSE 0 END +
+         CASE WHEN s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 1 ELSE 0 END +
+         CASE WHEN COALESCE(s.TL1,'') != '' AND COALESCE(s.TL2,'') != '' AND COALESCE(s.TL3,'') != '' THEN 1 ELSE 0 END +
+         CASE WHEN s.MAC_PC IS NOT NULL THEN 1 ELSE 0 END) as intro_completed_count
+        """
+
+        # Base query
+        base_query = """
         SELECT
             s.STUDENT_ID,
             s.EMAIL_ADDRESS,
@@ -32,6 +48,8 @@ async def get_all_attendees():
             s.PLAYED_2T1L,
             COALESCE(task_progress.tasks_completed, 0) as tasks_completed,
             COALESCE(task_progress.tasks_total, 11) as tasks_total,
+            COALESCE(survey_count.survey_count, 0) as surveys_completed,
+            {intro_count},
             CASE
                 WHEN s.ACK = 'Y' THEN 25
                 ELSE 0
@@ -45,7 +63,7 @@ async def get_all_attendees():
                 ELSE 0
             END +
             CASE
-                WHEN survey_count.survey_count > 0 THEN 25
+                WHEN (COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) > 0 THEN 25
                 ELSE 0
             END as overall_progress
         FROM STUDENTS s
@@ -62,10 +80,65 @@ async def get_all_attendees():
             FROM SURVEY_RESPONSES
             GROUP BY STUDENT_ID
         ) survey_count ON s.STUDENT_ID = survey_count.STUDENT_ID
-        ORDER BY s.NAME, s.EMAIL_ADDRESS
+        LEFT JOIN (
+            SELECT STUDENT_ID, 1 as has_feedback
+            FROM WORKSHOP_FEEDBACK
+            GROUP BY STUDENT_ID
+        ) wf ON s.STUDENT_ID = wf.STUDENT_ID
+        WHERE 1=1
         """
 
-        result = db.execute_query(query)
+        params = {}
+        conditions = []
+
+        if location:
+            conditions.append("s.LOCATION = :location")
+            params["location"] = location
+
+        if intro_lt is not None:
+            conditions.append("(CASE WHEN s.TEAM IS NOT NULL AND TRIM(s.TEAM) != '' THEN 1 ELSE 0 END + CASE WHEN s.INTRO IS NOT NULL AND TRIM(s.INTRO) != '' THEN 1 ELSE 0 END + CASE WHEN COALESCE(s.TL1,'') != '' AND COALESCE(s.TL2,'') != '' AND COALESCE(s.TL3,'') != '' THEN 1 ELSE 0 END + CASE WHEN s.MAC_PC IS NOT NULL THEN 1 ELSE 0 END) < :intro_lt")
+            params["intro_lt"] = intro_lt
+
+        if onboarding_lt is not None:
+            conditions.append("COALESCE(task_progress.tasks_completed, 0) < :onboarding_lt")
+            params["onboarding_lt"] = onboarding_lt
+
+        if survey_lt is not None:
+            conditions.append("(COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) < :survey_lt")
+            params["survey_lt"] = survey_lt
+
+        if ack_filter and ack_filter != "any":
+            conditions.append("s.ACK = :ack")
+            params["ack"] = ack_filter.upper()
+
+        where_clause = " AND ".join(conditions) if conditions else ""
+
+        # Sorting
+        valid_sort_fields = ["s.NAME", "s.LOCATION", "overall_progress", "intro_completed_count", "tasks_completed", "surveys_completed", "s.ACK"]
+        sort_field = next((field for field in valid_sort_fields if sort_by.lower() in field.lower()), "s.NAME")
+        if sort_by == "name":
+            sort_field = "s.NAME"
+        elif sort_by == "location":
+            sort_field = "s.LOCATION"
+        elif sort_by == "overall_progress":
+            sort_field = "overall_progress"
+        elif sort_by == "intro_completed":
+            sort_field = "intro_completed_count"
+        elif sort_by == "onboarding_completed":
+            sort_field = "tasks_completed"
+        elif sort_by == "surveys_completed":
+            sort_field = "surveys_completed"
+        elif sort_by == "ack":
+            sort_field = "s.ACK"
+        else:
+            sort_field = "s.NAME"
+
+        order_by = f"ORDER BY {sort_field} {order.upper()}"
+
+        full_query = base_query.format(intro_count=intro_count_subquery) + f" AND {where_clause}" if where_clause else base_query.format(intro_count=intro_count_subquery)
+        full_query += f" {order_by}"
+
+        result = db.execute_query(full_query, params)
 
         if not result:
             return []
@@ -83,7 +156,10 @@ async def get_all_attendees():
                 "played_2t1l": row[7],
                 "tasks_completed": row[8],
                 "tasks_total": row[9],
-                "overall_progress": row[10]
+                "surveys_completed": row[10],
+                "surveys_total": 11,
+                "intro_completed_count": row[11],
+                "overall_progress": row[12]
             }
             attendees.append(attendee)
 

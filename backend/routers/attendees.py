@@ -57,15 +57,15 @@ def calculate_progress(student_id: str) -> dict:
             )
             individual_surveys[survey_type] = (survey_check and survey_check[0][0] > 0)
 
-        # Overall survey completion (at least one survey submitted)
-        surveys_completed = sum(individual_surveys.values())
-
         # Check if overall workshop feedback has been submitted
         overall_feedback_check = db.execute_query(
             "SELECT COUNT(*) FROM WORKSHOP_FEEDBACK WHERE STUDENT_ID = :id",
             {"id": student_id}
         )
         overall_feedback_submitted = overall_feedback_check and overall_feedback_check[0][0] > 0
+
+        # Overall survey completion (session surveys + overall feedback)
+        surveys_completed = sum(individual_surveys.values()) + (1 if overall_feedback_submitted else 0)
 
         # Calculate overall progress (25% each for ACK, intro, onboarding, surveys)
         progress_score = 0
@@ -93,7 +93,7 @@ def calculate_progress(student_id: str) -> dict:
             "tasks_total": tasks_total,
             "surveys_submitted": overall_feedback_submitted,  # Actually check for overall feedback
             "surveys_completed": surveys_completed,
-            "surveys_total": len(survey_types),
+            "surveys_total": len(survey_types) + 1,
             "overall_progress": progress_score
         }
 

@@ -171,11 +171,14 @@ async function loadAdminData() {
             updateAdminProfile(adminData);
         }
 
-        // Load attendees list (placeholder for now)
+        // Load locations for filters and game
+        await loadLocations();
+
+        // Load attendees list
         updateAttendeesList();
 
-        // Load locations for game
-        await loadLocations();
+        // Set up filter event listeners
+        setupFilterListeners();
 
     } catch (error) {
         console.error('Error loading admin data:', error);
@@ -188,39 +191,46 @@ function updateAdminProfile(adminData) {
     console.log('Admin profile:', adminData.name, adminData.email_address);
 }
 
-async function updateAttendeesList() {
+async function updateAttendeesList(filterParams = '') {
     const attendeesTab = document.getElementById('attendees-tab');
-    const tableContainer = attendeesTab.querySelector('.attendees-table');
-    if (tableContainer) {
-        tableContainer.innerHTML = '<p>Loading attendees...</p>';
+    let tableContainer = attendeesTab.querySelector('.attendees-table');
+    if (!tableContainer) {
+        // Insert table container if not exists (before the static export button)
+        const staticExport = attendeesTab.querySelector('#export-csv-static');
+        const tableDiv = document.createElement('div');
+        tableDiv.className = 'attendees-table';
+        tableDiv.style.margin = '20px 0';
+        tableDiv.innerHTML = '<p>Loading attendees...</p>';
+        if (staticExport) {
+            attendeesTab.insertBefore(tableDiv, staticExport);
+        } else {
+            attendeesTab.innerHTML += '<div class="attendees-table" style="margin: 20px 0;"><p>Loading attendees...</p></div>';
+        }
+        tableContainer = attendeesTab.querySelector('.attendees-table');
     } else {
-        const existingContent = attendeesTab.innerHTML;
-        const newContent = existingContent.replace(
-            '<button class="btn-primary">Export to CSV</button>',
-            '<div class="attendees-table" style="margin: 20px 0;"><p>Loading attendees...</p></div><button class="btn-primary" id="export-csv">Export to CSV</button>'
-        );
-        attendeesTab.innerHTML = newContent;
+        tableContainer.innerHTML = '<p>Loading attendees...</p>';
     }
 
     try {
-        const response = await fetch('/api/admin/attendees');
+        const response = await fetch(`/api/admin/attendees${filterParams}`);
         if (!response.ok) {
             throw new Error('Failed to fetch attendees');
         }
         const attendees = await response.json();
 
         const tableHtml = `
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;" id="attendees-table">
                 <thead>
                     <tr style="background-color: #f2f2f2;">
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Name</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Email</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Location</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Team</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Progress</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">ACK</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Onboarded</th>
-                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Played 2T1L</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: default;">Name</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: default;">Email</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: default;">Location</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: default;">Team</th>
+                        <th class="sortable" data-sort="intro_completed" style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: pointer;">Intro</th>
+                        <th class="sortable" data-sort="onboarding_completed" style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: pointer;">Onboarding</th>
+                        <th class="sortable" data-sort="surveys_completed" style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: pointer;">Surveys</th>
+                        <th class="sortable" data-sort="ack" style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: pointer;">ACK</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; cursor: default;">Played 2T1L</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -230,9 +240,10 @@ async function updateAttendeesList() {
                             <td style="padding: 8px;">${attendee.email_address}</td>
                             <td style="padding: 8px;">${attendee.location || 'N/A'}</td>
                             <td style="padding: 8px;">${attendee.team || 'N/A'}</td>
-                            <td style="padding: 8px;">${attendee.overall_progress}%</td>
+                            <td style="padding: 8px;">${attendee.intro_completed_count || 0}/4</td>
+                            <td style="padding: 8px;">${attendee.tasks_completed || 0}/${attendee.tasks_total || 11}</td>
+                            <td style="padding: 8px;">${(attendee.surveys_completed || 0)}/${attendee.surveys_total || 11}</td>
                             <td style="padding: 8px;">${attendee.ack === 'Y' ? 'Yes' : 'No'}</td>
-                            <td style="padding: 8px;">${attendee.on_boarded === 'Y' ? 'Yes' : 'No'}</td>
                             <td style="padding: 8px;">${attendee.played_2t1l === 'Y' ? 'Yes' : 'No'}</td>
                         </tr>
                     `).join('')}
@@ -240,26 +251,25 @@ async function updateAttendeesList() {
             </table>
         `;
 
-        const tableContainer = attendeesTab.querySelector('.attendees-table');
         tableContainer.innerHTML = tableHtml;
 
-        // Add CSV export functionality
-        const exportBtn = document.getElementById('export-csv');
+        // Store attendees for export
+        window.currentAttendees = attendees;
+
+        // Add CSV export functionality to dynamic button if exists, else use static
+        const exportBtn = document.getElementById('export-csv') || document.getElementById('export-csv-static');
         if (exportBtn && attendees.length > 0) {
             exportBtn.addEventListener('click', () => exportToCSV(attendees));
         }
 
     } catch (error) {
         console.error('Error loading attendees:', error);
-        const tableContainer = attendeesTab.querySelector('.attendees-table');
-        if (tableContainer) {
-            tableContainer.innerHTML = '<p>Error loading attendees. Please try again.</p>';
-        }
+        tableContainer.innerHTML = '<p>Error loading attendees. Please try again.</p>';
     }
 }
 
 function exportToCSV(attendees) {
-    const headers = ['Name', 'Email', 'Location', 'Team', 'Progress (%)', 'ACK', 'Onboarded', 'Played 2T1L'];
+    const headers = ['Name', 'Email', 'Location', 'Team', 'Intro', 'Onboarding', 'Surveys', 'ACK', 'Played 2T1L'];
     const csvRows = [
         headers.join(','),
         ...attendees.map(attendee => [
@@ -267,9 +277,10 @@ function exportToCSV(attendees) {
             attendee.email_address,
             attendee.location || '',
             attendee.team || '',
-            attendee.overall_progress,
+            `${attendee.intro_completed_count || 0}/4`,
+            `${(attendee.tasks_completed || 0)}/${attendee.tasks_total || 11}`,
+            `${(attendee.surveys_completed || 0)}/10`,
             attendee.ack === 'Y' ? 'Yes' : 'No',
-            attendee.on_boarded === 'Y' ? 'Yes' : 'No',
             attendee.played_2t1l === 'Y' ? 'Yes' : 'No'
         ].join(','))
     ].join('\n');
@@ -284,28 +295,91 @@ function exportToCSV(attendees) {
 }
 
 async function loadLocations() {
-    const locationSelect = document.getElementById('location-select');
+    const locationSelectGame = document.getElementById('location-select');
+    const locationSelectFilter = document.getElementById('filter-location');
 
-    if (locationSelect) {
-        try {
-            const response = await fetch('/api/admin/locations');
-            if (response.ok) {
-                const data = await response.json();
-                // Clear existing options except default
-                locationSelect.innerHTML = '<option value="">Select Location</option>';
+    try {
+        const response = await fetch('/api/admin/locations');
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Populate game select
+            if (locationSelectGame) {
+                locationSelectGame.innerHTML = '<option value="">Select Location</option>';
                 data.locations.forEach(loc => {
                     const option = document.createElement('option');
                     option.value = loc;
                     option.textContent = loc;
-                    locationSelect.appendChild(option);
+                    locationSelectGame.appendChild(option);
                 });
-            } else {
-                console.error('Failed to load locations');
             }
-        } catch (error) {
-            console.error('Error loading locations:', error);
+            
+            // Populate filter select
+            if (locationSelectFilter) {
+                locationSelectFilter.innerHTML = '<option value="">Any</option>';
+                data.locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc;
+                    option.textContent = loc;
+                    locationSelectFilter.appendChild(option);
+                });
+            }
+        } else {
+            console.error('Failed to load locations');
         }
+    } catch (error) {
+        console.error('Error loading locations:', error);
     }
+}
+
+function setupFilterListeners() {
+    const applyBtn = document.getElementById('apply-filters');
+    const clearBtn = document.getElementById('clear-filters');
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', applyFilters);
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearFilters);
+    }
+}
+
+function getFilterParams() {
+    const location = document.getElementById('filter-location')?.value || '';
+    const introLt = document.getElementById('filter-intro-lt')?.value ? parseInt(document.getElementById('filter-intro-lt').value) : null;
+    const onboardingLt = document.getElementById('filter-onboarding-lt')?.value ? parseInt(document.getElementById('filter-onboarding-lt').value) : null;
+    const surveyLt = document.getElementById('filter-survey-lt')?.value ? parseInt(document.getElementById('filter-survey-lt').value) : null;
+    const ack = document.getElementById('filter-ack')?.value || 'any';
+    const sortBy = document.getElementById('filter-sort-by')?.value || 'name';
+    const order = document.getElementById('filter-order')?.value || 'asc';
+
+    const params = new URLSearchParams();
+    if (location) params.append('location', location);
+    if (introLt !== null) params.append('intro_lt', introLt);
+    if (onboardingLt !== null) params.append('onboarding_lt', onboardingLt);
+    if (surveyLt !== null) params.append('survey_lt', surveyLt);
+    if (ack !== 'any') params.append('ack_filter', ack);
+    params.append('sort_by', sortBy);
+    params.append('order', order);
+
+    return '?' + params.toString();
+}
+
+async function applyFilters() {
+    const filterParams = getFilterParams();
+    await updateAttendeesList(filterParams);
+}
+
+async function clearFilters() {
+    document.getElementById('filter-location').value = '';
+    document.getElementById('filter-intro-lt').value = '';
+    document.getElementById('filter-onboarding-lt').value = '';
+    document.getElementById('filter-survey-lt').value = '';
+    document.getElementById('filter-ack').value = 'any';
+    document.getElementById('filter-sort-by').value = 'name';
+    document.getElementById('filter-order').value = 'asc';
+    await updateAttendeesList('');
 }
 
 async function loadNextAttendee() {
