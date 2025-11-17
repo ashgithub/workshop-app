@@ -16,5 +16,5 @@ app:
 
 proxy:
   enabled: false  # Set to true when running behind nginx proxy
-  prefix: ""  # URL prefix when behind proxy (e.g., "/workshop-app")
-  bearer_token: ""  # Bearer token required for proxy authentication
+  prefix: "/workshop-app"  # URL prefix when behind proxy (e.g., "/workshop-app")
+  bearer_token: $MINI_BEAERER  # Bearer token required for proxy authentication
