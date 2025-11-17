@@ -229,6 +229,39 @@ async def get_locations():
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.get("/game/progress")
+async def get_game_progress(location: Optional[str] = None):
+    """
+    Get progress for 2 Truths and a Lie game: number played vs total attendees for a location.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required")
+
+        # Total: all attendees in location
+        total_result = db.execute_query("""
+            SELECT COUNT(*) FROM STUDENTS 
+            WHERE LOCATION = :location
+        """, {"location": location})
+        total = total_result[0][0] if total_result and len(total_result) > 0 else 0
+
+        # Played: PLAYED_2T1L = 'Y'
+        played_result = db.execute_query("""
+            SELECT COUNT(*) FROM STUDENTS 
+            WHERE LOCATION = :location 
+            AND PLAYED_2T1L = 'Y'
+        """, {"location": location})
+        played_count = played_result[0][0] if played_result and len(played_result) > 0 else 0
+
+        return {"played": played_count, "total": total, "progress": f"{played_count}/{total}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting game progress for location {location}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.get("/game/next")
 async def get_next_game_attendee(location: Optional[str] = None):
     """
@@ -238,13 +271,12 @@ async def get_next_game_attendee(location: Optional[str] = None):
         if not location:
             raise HTTPException(status_code=400, detail="Location parameter required")
 
-        # Get random attendee who hasn't played
+        # Get random attendee who hasn't played (all are eligible, even without statements)
         result = db.execute_query("""
-            SELECT STUDENT_ID, NAME, TL1, TL2, TL3, FACE_IMAGE
+            SELECT STUDENT_ID, NAME, EMAIL_ADDRESS, TEAM, LOCATION, INTRO, TL1, TL2, TL3, FACE_IMAGE
             FROM STUDENTS
             WHERE LOCATION = :location
             AND (PLAYED_2T1L IS NULL OR PLAYED_2T1L = 'N')
-            AND TL1 IS NOT NULL AND TL2 IS NOT NULL AND TL3 IS NOT NULL
             ORDER BY DBMS_RANDOM.VALUE
             FETCH FIRST 1 ROW ONLY
         """, {"location": location})
@@ -256,10 +288,14 @@ async def get_next_game_attendee(location: Optional[str] = None):
         attendee = {
             "student_id": row[0],
             "name": row[1],
-            "tl1": row[2],
-            "tl2": row[3],
-            "tl3": row[4],
-            "image_filename": row[5]
+            "email_address": row[2],
+            "team": row[3],
+            "location": row[4],
+            "intro": row[5],
+            "tl1": row[6],
+            "tl2": row[7],
+            "tl3": row[8],
+            "image_filename": row[9]
         }
 
         return {"attendee": attendee}
@@ -300,4 +336,37 @@ async def mark_attendee_as_played(student_id: str):
         raise
     except Exception as e:
         logger.error(f"Error marking attendee {student_id} as played: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/reset")
+async def reset_game_flags(location: Optional[str] = None):
+    """
+    Reset PLAYED_2T1L flags to 'N' for all attendees in a specific location.
+    If no location provided, resets all attendees.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required for targeted reset. Omit for global reset.")
+
+        # Check if location exists
+        location_check = db.execute_query(
+            "SELECT COUNT(*) FROM STUDENTS WHERE LOCATION = :location",
+            {"location": location}
+        )
+        if not location_check or location_check[0][0] == 0:
+            raise HTTPException(status_code=404, detail="No attendees found for the specified location")
+
+        # Update played status to reset
+        affected_rows = db.execute_dml(
+            "UPDATE STUDENTS SET PLAYED_2T1L = 'N' WHERE LOCATION = :location",
+            {"location": location}
+        )
+
+        return {"message": f"Reset {affected_rows} attendees from location {location} to unplayed status"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting game flags for location {location}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

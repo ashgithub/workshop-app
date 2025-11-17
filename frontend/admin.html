@@ -35,13 +35,14 @@
             </div>
 
             <div id="game-tab" class="tab-content">
-                <h2>2 Truths and a Lie Game</h2>
+                <h2>2 Truths and a Lie Game <span id="game-progress" class="progress-indicator" style="display: none;"></span></h2>
                 <p>Interactive icebreaker game for workshop attendees.</p>
                 <div class="game-controls">
                     <select id="location-select">
                         <option value="">Select Location</option>
                     </select>
-                    <button class="btn-primary" id="start-game-btn">Start Game</button>
+                    <button class="btn-primary" id="start-game-btn" style="margin-left: 10px;">Start Game</button>
+                    <button class="btn-secondary" id="reset-game-btn" style="margin-left: 10px;">Reset Game for Location</button>
                 </div>
                 <div id="game-display"></div>
             </div>
