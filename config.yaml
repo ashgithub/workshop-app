@@ -15,6 +15,6 @@ app:
   secret_key:  $SECRET_KEY:your-secret-key-change-in-production
 
 proxy:
-  enabled: false  # Set to true when running behind nginx proxy
+  enabled: $PROXY  # Set to true when running behind nginx proxy
   prefix: "/workshop-app"  # URL prefix when behind proxy (e.g., "/workshop-app")
   bearer_token: $MINI_BEAERER  # Bearer token required for proxy authentication
