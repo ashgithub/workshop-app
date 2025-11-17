@@ -737,11 +737,11 @@ function updateAttendeeProfile(attendee) {
     const imgElement = document.getElementById('profile-img');
     if (imgElement && attendee.image_filename) {
         // Use the image serving endpoint
-        imgElement.src = `/api/attendees/${attendee.student_id}/image`;
+        imgElement.src = `api/attendees/${attendee.student_id}/image`;
         imgElement.style.display = 'block';
     } else {
         // Keep the default/fallback image - try SVG first
-        imgElement.src = '/static/images/default-avatar.svg';
+        imgElement.src = 'static/images/default-avatar.svg';
     }
 }
 

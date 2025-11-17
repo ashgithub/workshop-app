@@ -129,9 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Redirect based on user type
                 if (data.is_admin) {
-                    window.location.href = '/admin.html';
+                    window.location.href = 'admin.html';
                 } else {
-                    window.location.href = '/attendee.html';
+                    window.location.href = 'attendee.html';
                 }
             } else {
                 showMessage(data.detail || 'Login failed', 'error');
