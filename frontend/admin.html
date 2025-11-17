@@ -24,9 +24,9 @@
                     <label>Location: <select id="filter-location">
                         <option value="">Any</option>
                     </select></label>
-                    <label>Intro < : <input type="number" id="filter-intro-lt" min="0" max="2" value="" placeholder="e.g. 1" style="width: 60px;"></label>
-                    <label>Onboarding < : <input type="number" id="filter-onboarding-lt" min="0" max="11" value="" placeholder="e.g. 5" style="width: 60px;"></label>
-                    <label>Survey < : <input type="number" id="filter-survey-lt" min="0" max="5" value="" placeholder="e.g. 2" style="width: 60px;"></label>
+                    <label>Intro <= : <input type="number" id="filter-intro-lt" min="1" max="4" value="" placeholder="e.g. 2" style="width: 60px;"></label>
+                    <label>Onboarding <= : <input type="number" id="filter-onboarding-lt" min="1" max="11" value="" placeholder="e.g. 5" style="width: 60px;"></label>
+                    <label>Survey <= : <input type="number" id="filter-survey-lt" min="1" max="11" value="" placeholder="e.g. 3" style="width: 60px;"></label>
                     <label>ACK: <select id="filter-ack">
                         <option value="any">Any</option>
                         <option value="Y">Yes</option>
@@ -35,7 +35,6 @@
                     <button class="btn-primary" id="apply-filters">Apply Filters</button>
                     <button class="btn-secondary" id="clear-filters">Clear</button>
                 </div>
-                <p>Attendee management table will be implemented here.</p>
                 <button class="btn-primary" id="export-csv-static">Export to CSV</button>
             </div>
 

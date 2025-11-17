@@ -219,6 +219,7 @@ async function updateAttendeesList(filterParams = '') {
         const attendees = await response.json();
 
         const tableHtml = `
+            <p>Total attendees displayed: ${attendees.length}</p>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;" id="attendees-table">
                 <thead>
                     <tr style="background-color: #f2f2f2;">

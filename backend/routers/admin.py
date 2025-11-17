@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 @router.get("/attendees")
 async def get_all_attendees(
     location: Optional[str] = Query(None, description="Filter by location (e.g., AUS)"),
-    intro_lt: Optional[int] = Query(None, description="Filter attendees with intro completed count < x"),
-    onboarding_lt: Optional[int] = Query(None, description="Filter attendees with onboarding tasks completed < x"),
-    survey_lt: Optional[int] = Query(None, description="Filter attendees with surveys completed < x"),
+    intro_lt: Optional[int] = Query(None, description="Filter attendees with intro completed count <= x"),
+    onboarding_lt: Optional[int] = Query(None, description="Filter attendees with onboarding tasks completed <= x"),
+    survey_lt: Optional[int] = Query(None, description="Filter attendees with surveys completed <= x"),
     ack_filter: Optional[str] = Query(None, regex="^(Y|N|any)$", description="Filter by ACK (Y, N, or any)"),
     sort_by: Optional[str] = Query("name", description="Sort by field: name, location, overall_progress, intro_completed, onboarding_completed, surveys_completed"),
     order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order: asc or desc")
@@ -105,24 +105,27 @@ async def get_all_attendees(
             conditions.append("""(
                 CASE WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 THEN 1 ELSE 0 END +
                 CASE WHEN s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0 
-                        AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0 
+                CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0
+                        AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0
                         AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
                 CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END
-            ) < :intro_lt""")
+            ) <= :intro_lt""")
             params["intro_lt"] = intro_lt
 
         if onboarding_lt is not None:
-            conditions.append("COALESCE(task_progress.tasks_completed, 0) < :onboarding_lt")
+            conditions.append("COALESCE(task_progress.tasks_completed, 0) <= :onboarding_lt")
             params["onboarding_lt"] = onboarding_lt
 
         if survey_lt is not None:
-            conditions.append("(COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) < :survey_lt")
+            conditions.append("(COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) <= :survey_lt")
             params["survey_lt"] = survey_lt
 
         if ack_filter and ack_filter != "any":
-            conditions.append("s.ACK = :ack")
-            params["ack"] = ack_filter.upper()
+            ack_upper = ack_filter.upper()
+            if ack_upper == "Y":
+                conditions.append("s.ACK = 'Y'")
+            elif ack_upper == "N":
+                conditions.append("(s.ACK != 'Y' OR s.ACK IS NULL)")
 
         where_clause = " AND ".join(conditions) if conditions else ""
 
@@ -164,12 +167,7 @@ async def get_all_attendees(
                     f"[DEBUG] vineet.bedi@oracle.com - TEAM:{row[4]!r} INTRO:{row[5]!r} TL1:{row[6]!r} TL2:{row[7]!r} TL3:{row[8]!r} MAC_PC:{row[9]!r} "
                     f"INTRO_COMPLETED_COUNT:{row[16]!r} TASKS:{row[13]!r}/{row[14]!r} SURVEYS:{row[15]!r}/11"
                 )
-            # Dump all other users only if total intro_completed_count or surveys/tasks is nonzero (for summary analysis)
-            if row[16] != 0 or row[13] != 0 or row[15] != 0:
-                logging.warning(
-                    f"[DEBUG] TOTALS - EMAIL:{row[1]!r} TEAM:{row[4]!r} INTRO:{row[5]!r} TL1:{row[6]!r} TL2:{row[7]!r} TL3:{row[8]!r} MAC_PC:{row[9]!r} "
-                    f"INTRO_COMPLETED_COUNT:{row[16]!r} TASKS:{row[13]!r}/{row[14]!r} SURVEYS:{row[15]!r}/11"
-                )
+
             attendee = {
                 "student_id": row[0],
                 "email_address": row[1],
