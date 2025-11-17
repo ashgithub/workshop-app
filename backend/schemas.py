@@ -68,6 +68,11 @@ class TaskUpdate(BaseModel):
     completed: str = Field(..., pattern=r'^[YN]$')
 
 
+class TaskCompletionUpdate(BaseModel):
+    task_code: str = Field(..., max_length=50)
+    completed: str = Field(..., pattern=r'^[YN]$')
+
+
 class Task(BaseModel):
     task_id: int
     student_id: str

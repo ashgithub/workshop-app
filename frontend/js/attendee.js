@@ -112,43 +112,66 @@ function updateProgressOverview(attendee) {
 function updateIntroductionSection(attendee) {
     const introTab = document.getElementById('introduction-tab');
 
+    // Calculate progress for each subsection
+    // Acknowledgement section: 1 item
+    const ackCompleted = attendee.ack === 'Y' ? 1 : 0;
+    const ackTotal = 1;
+
+    // Introduction section: 4 items (team, intro text, truths/lies, device)
+    let introCompletedCount = 0;
+    const introTotal = 4;
+
+    if (attendee.team && attendee.team.trim()) introCompletedCount++;
+    if (attendee.intro && attendee.intro.trim()) introCompletedCount++;
+    if ((attendee.tl1 && attendee.tl1.trim()) &&
+        (attendee.tl2 && attendee.tl2.trim()) &&
+        (attendee.tl3 && attendee.tl3.trim())) introCompletedCount++;
+    if (attendee.mac_pc) introCompletedCount++;
+
     const introHtml = `
         <h2>Introduction</h2>
-        <div class="introduction-form">
-            <h3>Workshop Acknowledgment</h3>
-            <div class="form-group">
-                <label for="ack-checkbox">
-                    <input type="checkbox" id="ack-checkbox" ${attendee.ack === 'Y' ? 'checked' : ''}>
-                    I acknowledge participation in this workshop
-                </label>
-            </div>
 
-            <h3>Introduction Details</h3>
-            <div class="form-group">
-                <label for="team-input">1. Team Name:</label>
-                <input type="text" id="team-input" value="${attendee.team || ''}" placeholder="Enter your team name">
+        <div class="subsection">
+            <h3>Acknowledgement <span class="progress-indicator">${ackCompleted}/${ackTotal} completed</span></h3>
+            <div class="subsection-content">
+                <div class="form-group ${attendee.ack === 'Y' ? 'completed' : ''}">
+                    <label for="ack-checkbox">
+                        <input type="checkbox" id="ack-checkbox" ${attendee.ack === 'Y' ? 'checked' : ''}>
+                        I acknowledge participation in this workshop
+                    </label>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label for="intro-textarea">2. Introduction:</label>
-                <textarea id="intro-textarea" rows="4" placeholder="Tell us about yourself...">${attendee.intro || ''}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label>3. 2 Truths and a Lie:</label>
-                <input type="text" id="tl1-input" value="${attendee.tl1 || ''}" placeholder="Truth or Lie #1">
-                <input type="text" id="tl2-input" value="${attendee.tl2 || ''}" placeholder="Truth or Lie #2">
-                <input type="text" id="tl3-input" value="${attendee.tl3 || ''}" placeholder="Truth or Lie #3">
-            </div>
-
-            <div class="form-group">
-                <label>4. Device Preference:</label>
-                <label><input type="radio" name="device" value="M" ${attendee.mac_pc === 'M' ? 'checked' : ''}> Mac</label>
-                <label><input type="radio" name="device" value="P" ${attendee.mac_pc === 'P' ? 'checked' : ''}> PC</label>
-            </div>
-
-            <button id="save-intro-btn" class="btn-primary">Save Introduction</button>
         </div>
+
+        <div class="subsection">
+            <h3>Introduction <span class="progress-indicator">${introCompletedCount}/${introTotal} completed</span></h3>
+            <div class="subsection-content">
+                <div class="form-group ${attendee.team && attendee.team.trim() ? 'completed' : ''}">
+                    <label for="team-input">1. Team Name:</label>
+                    <input type="text" id="team-input" value="${attendee.team || ''}" placeholder="Enter your team name">
+                </div>
+
+                <div class="form-group ${attendee.intro && attendee.intro.trim() ? 'completed' : ''}">
+                    <label for="intro-textarea">2. Introduction:</label>
+                    <textarea id="intro-textarea" rows="4" placeholder="Tell us about yourself...">${attendee.intro || ''}</textarea>
+                </div>
+
+                <div class="form-group ${(attendee.tl1 && attendee.tl1.trim()) && (attendee.tl2 && attendee.tl2.trim()) && (attendee.tl3 && attendee.tl3.trim()) ? 'completed' : ''}">
+                    <label>3. 2 Truths and a Lie:</label>
+                    <input type="text" id="tl1-input" value="${attendee.tl1 || ''}" placeholder="Truth or Lie #1">
+                    <input type="text" id="tl2-input" value="${attendee.tl2 || ''}" placeholder="Truth or Lie #2">
+                    <input type="text" id="tl3-input" value="${attendee.tl3 || ''}" placeholder="Truth or Lie #3">
+                </div>
+
+                <div class="form-group ${attendee.mac_pc ? 'completed' : ''}">
+                    <label>4. Device Preference:</label>
+                    <label><input type="radio" name="device" value="M" ${attendee.mac_pc === 'M' ? 'checked' : ''}> Mac</label>
+                    <label><input type="radio" name="device" value="P" ${attendee.mac_pc === 'P' ? 'checked' : ''}> PC</label>
+                </div>
+            </div>
+        </div>
+
+        <button id="save-intro-btn" class="btn-primary">Save Introduction</button>
     `;
 
     introTab.innerHTML = introHtml;
@@ -224,18 +247,20 @@ function updateTasksSection(tasks, studentId, attendee) {
         'run_code': 'Run workshop code'
     };
 
-    // Create task items HTML
+    // Create task items HTML and count completed tasks
     let tasksListHtml = '';
     const taskOrder = ['tenancy_access', 'install_uv', 'install_vscode', 'install_cline', 'install_aider', 'install_sqlcl', 'setup_oci', 'clone_repo', 'uv_sync', 'setup_env', 'run_code'];
+    let completedCount = 0;
 
     taskOrder.forEach((taskCode, index) => {
         const task = tasks.find(t => t.task_code === taskCode);
         const isCompleted = task ? task.completed === 'Y' : false;
+        if (isCompleted) completedCount++;
         const taskName = taskNames[taskCode] || taskCode;
         const taskNumber = index + 1;
 
         tasksListHtml += `
-            <div class="task-item">
+            <div class="task-item ${isCompleted ? 'completed' : ''}">
                 <input type="checkbox" id="task-${index + 1}" data-task="${taskCode}" ${isCompleted ? 'checked' : ''}>
                 <label for="task-${index + 1}">${taskNumber}. ${taskName}</label>
             </div>
@@ -243,7 +268,7 @@ function updateTasksSection(tasks, studentId, attendee) {
     });
 
     const tasksHtml = `
-        <h2>Onboarding Tasks</h2>
+        <h2>Onboarding Tasks <span class="progress-indicator">${completedCount}/${taskOrder.length} completed</span></h2>
         <p>Complete these tasks to finish your workshop onboarding:</p>
         <div class="tasks-list">
             ${tasksListHtml}
@@ -252,7 +277,7 @@ function updateTasksSection(tasks, studentId, attendee) {
             <label for="onboarding-comments-textarea">Onboarding Comments:</label>
             <textarea id="onboarding-comments-textarea" rows="3" placeholder="Any comments about the onboarding process...">${attendee.onboarding_comments || ''}</textarea>
         </div>
-        <button id="save-comments-btn" class="btn-secondary">Save Comments</button>
+        <button id="save-comments-btn" class="btn-primary">Save Comments</button>
     `;
 
     tasksTab.innerHTML = tasksHtml;
@@ -285,8 +310,7 @@ async function updateTaskCompletion(studentId, taskCode, completed) {
         });
 
         if (response.ok) {
-            showSuccess('Task updated successfully!');
-            // Reload attendee data to update progress
+            // Reload attendee data to update progress (silent success)
             loadAttendeeData(studentId);
         } else {
             throw new Error('Failed to update task');
@@ -348,23 +372,68 @@ function updateSurveysSection(attendee) {
         { code: 'dev_productivity', name: 'Dev Productivity', shortName: 'Dev Tools' }
     ];
 
+    // Compute completed surveys from attendee.progress
+    const progress = attendee.progress;
+    let surveysCompleted = 0;
+    let completedMap = {};
+
+    // For each session survey, check if completed (using progress or fallback)
+    if (progress && progress.intro_details) {
+        sessionSurveys.forEach((survey) => {
+            if (progress[`survey_${survey.code}_completed`] !== undefined) {
+                completedMap[survey.code] = !!progress[`survey_${survey.code}_completed`];
+            } else if (progress[`surveys_completed`] !== undefined) {
+                // progressive fallback for demo: If progress.surveys_completed >= n, count n as done
+                completedMap[survey.code] = false;
+            }
+            // We'll do live validation later
+        });
+    }
+
+    // If attendee.surveys_completed exists & is a number, reflect in completedMap
+    if (progress && typeof progress.surveys_completed === "number") {
+        // Just assume the first N are completed
+        for (let i = 0; i < progress.surveys_completed; i++) {
+            completedMap[sessionSurveys[i]?.code] = true;
+        }
+    }
+
+    // Count completed
+    surveysCompleted = Object.values(completedMap).filter(Boolean).length;
+
+    // Now let's display the count in a badge
+    let surveyHeaderCount = `${surveysCompleted}/${sessionSurveys.length} completed`;
+
+    // Place the survey progress badge to the right of the Workshop Surveys header
+    let surveysHeaderHtml = `
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h2 style="margin-bottom:0;">Workshop Surveys</h2>
+          <span class="progress-indicator">${surveyHeaderCount}</span>
+        </div>
+        <p>Rate each workshop session individually:</p>
+    `;
+
     // Create survey tab navigation
-    let surveyTabsHtml = '<div class="survey-tabs"><div class="tab-buttons">';
+    let surveyTabsHtml = `<div class="survey-tabs"><div class="tab-buttons">`;
     let surveyContentHtml = '<div class="tab-content-container">';
 
     sessionSurveys.forEach((survey, index) => {
-        // Check if survey is completed (has been submitted) - this is a simplified check
-        const isCompleted = false; // For now, we'll implement proper completion checking later
-
+        // Is this survey completed?
+        const isCompleted = !!completedMap[survey.code];
         const statusIcon = isCompleted ? '✅' : '⏳';
 
         surveyTabsHtml += `
-            <button class="survey-tab-btn ${index === 0 ? 'active' : ''}" data-tab="${survey.code}">
-                <span class="tab-status">${statusIcon}</span>
+            <button class="survey-tab-btn ${isCompleted ? 'completed' : ''} ${index === 0 ? 'active' : ''}" data-tab="${survey.code}">
                 <span class="tab-name">${survey.shortName}</span>
+                ${
+                  isCompleted
+                    ? '<span class="pill pill-complete">Complete</span>'
+                    : '<span class="pill pill-pending">Incomplete</span>'
+                }
             </button>
         `;
 
+        // Prefill placeholders with unique ids; these will be populated dynamically
         surveyContentHtml += `
             <div class="survey-tab-content ${index === 0 ? 'active' : ''}" id="${survey.code}-tab">
                 <div class="survey-form">
@@ -393,21 +462,72 @@ function updateSurveysSection(attendee) {
                         <textarea id="${survey.code}-better" rows="3" placeholder="Suggestions for improvement..."></textarea>
                     </div>
 
-                    <button class="submit-survey-btn" data-survey="${survey.code}">Submit Feedback</button>
+                    <button class="btn-primary" data-survey="${survey.code}">Submit Feedback</button>
+                    <div class="survey-loading" id="${survey.code}-loading" style="display:none;color:#999;font-size:0.95em;margin-top:8px;">Loading previous response...</div>
                 </div>
             </div>
         `;
     });
 
+    // Client-side: After all tabs rendered above, load prior data
+    setTimeout(() => {
+        const studentId = localStorage.getItem("student_id");
+        sessionSurveys.forEach((survey) => {
+            const loadingDiv = document.getElementById(`${survey.code}-loading`);
+            if (loadingDiv) loadingDiv.style.display = "block";
+            fetch(`/api/surveys/?student_id=${encodeURIComponent(studentId)}&survey_type=${encodeURIComponent(survey.code)}`)
+                .then(resp => {
+                    if (!resp.ok) throw new Error(`Failed to get previous survey`);
+                    return resp.json();
+                })
+                .then(data => {
+                    // Fill if data found
+                    if (data && (data.rating || data.what_liked || data.what_better)) {
+                        // Set rating buttons
+                        const ratingDiv = document.getElementById(`${survey.code}-rating`);
+                        if (ratingDiv && data.rating) {
+                            const btns = ratingDiv.querySelectorAll(".emoji-btn");
+                            btns.forEach(btn => {
+                                if (btn.getAttribute('data-rating') === String(data.rating)) {
+                                    btn.classList.add("selected");
+                                    ratingDiv.setAttribute('data-selected-rating', data.rating);
+                                    const selectedDiv = document.getElementById(`${survey.code}-selected`);
+                                    if (selectedDiv) {
+                                        selectedDiv.textContent = `Selected: ${btn.textContent} (${data.rating}/5)`;
+                                    }
+                                }
+                            });
+                        }
+                        // Set what_liked/what_better if available
+                        if (data.what_liked !== undefined) {
+                            const liked = document.getElementById(`${survey.code}-liked`);
+                            if (liked) liked.value = data.what_liked;
+                        }
+                        if (data.what_better !== undefined) {
+                            const better = document.getElementById(`${survey.code}-better`);
+                            if (better) better.value = data.what_better;
+                        }
+                        // Optionally show that data is loaded after a short timeout
+                        setTimeout(() => { if (loadingDiv) loadingDiv.style.display = "none"; }, 500);
+                    } else {
+                        if (loadingDiv) loadingDiv.style.display = "none";
+                    }
+                })
+                .catch(() => { if (loadingDiv) loadingDiv.style.display = "none"; });
+        });
+    }, 1);
+
     // Add overall feedback as a separate tab
     const overallCompleted = attendee.progress.surveys_submitted; // Overall feedback submitted
-    const overallTabClass = overallCompleted ? 'completed' : 'pending';
-    const overallStatusIcon = overallCompleted ? '✅' : '⏳';
 
     surveyTabsHtml += `
-        <button class="survey-tab-btn" data-tab="overall">
-            <span class="tab-status">${overallStatusIcon}</span>
+        <button class="survey-tab-btn ${overallCompleted ? 'completed' : ''}" data-tab="overall">
             <span class="tab-name">Overall</span>
+            ${
+              overallCompleted
+                ? '<span class="pill pill-complete">Complete</span>'
+                : '<span class="pill pill-pending">Incomplete</span>'
+            }
         </button>
     </div>`;
 
@@ -434,14 +554,13 @@ function updateSurveysSection(attendee) {
                     <label>Future workshop ideas:</label>
                     <textarea id="overall-future" rows="3" placeholder="Suggestions for future workshops..."></textarea>
                 </div>
-                <button class="submit-survey-btn" data-survey="overall">Submit Overall Feedback</button>
+                <button class="btn-primary" data-survey="overall">Submit Overall Feedback</button>
             </div>
         </div>
     </div>`;
 
     const surveysHtml = `
-        <h2>Workshop Surveys</h2>
-        <p>Rate each workshop session individually:</p>
+        ${surveysHeaderHtml}
         ${surveyTabsHtml}
         ${surveyContentHtml}
     `;
@@ -491,7 +610,7 @@ function updateSurveysSection(attendee) {
     });
 
     // Add submit button functionality
-    const submitButtons = surveysTab.querySelectorAll('.submit-survey-btn');
+    const submitButtons = surveysTab.querySelectorAll('.btn-primary[data-survey]');
     submitButtons.forEach(button => {
         button.addEventListener('click', function() {
             const surveyCode = this.getAttribute('data-survey');
@@ -582,8 +701,16 @@ async function submitOverallFeedback(studentId) {
             document.getElementById('overall-rating').value = '';
             document.getElementById('overall-comments').value = '';
             document.getElementById('future-ideas').value = '';
-            // Reload data to update progress
+            // Reload data to update progress, but do not switch tabs
+            const activeSurveyTab = document.querySelector('.survey-tab-btn.active');
+            const activeSurvey = activeSurveyTab ? activeSurveyTab.getAttribute('data-tab') : null;
             loadAttendeeData(studentId);
+            setTimeout(() => {
+                if (activeSurvey) {
+                    const btn = document.querySelector(`.survey-tab-btn[data-tab="${activeSurvey}"]`);
+                    if (btn && !btn.classList.contains('active')) btn.click();
+                }
+            }, 250);
         } else {
             throw new Error('Failed to submit feedback');
         }

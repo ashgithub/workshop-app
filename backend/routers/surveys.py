@@ -1,7 +1,7 @@
 """
 Survey management router for session surveys and workshop feedback.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 import logging
 
 from ..database import db
@@ -15,6 +15,31 @@ SURVEY_TYPES = [
     'onboarding', 'llms', 'rag', 'function_calling', 'agents',
     'database', 'speech', 'vision', 'demos', 'dev_productivity'
 ]
+
+
+@router.get("/")
+async def get_session_survey(student_id: str = Query(...), survey_type: str = Query(...)):
+    """
+    Get a previously submitted session survey response for a student and survey type.
+    """
+    try:
+        query = """
+        SELECT RATING, WHAT_LIKED, WHAT_BETTER, COMMENTS
+        FROM SURVEY_RESPONSES
+        WHERE STUDENT_ID = :student_id AND SURVEY_TYPE = :survey_type
+        """
+        row = db.execute_query(query, {"student_id": student_id, "survey_type": survey_type})
+        if not row:
+            return {}
+        return {
+            "rating": row[0][0],
+            "what_liked": row[0][1],
+            "what_better": row[0][2],
+            "comments": row[0][3],
+        }
+    except Exception as e:
+        logger.error(f"Error getting survey for student {student_id}, type {survey_type}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/")
@@ -35,16 +60,18 @@ async def submit_session_survey(survey_data: SurveyResponseCreate):
         if not student_check:
             raise HTTPException(status_code=404, detail="Student not found")
 
-        # Insert survey response
-        insert_query = """
-        INSERT INTO SURVEY_RESPONSES (
-            STUDENT_ID, SURVEY_TYPE, RATING, WHAT_LIKED, WHAT_BETTER, COMMENTS
-        ) VALUES (
-            :student_id, :survey_type, :rating, :what_liked, :what_better, :comments
-        )
+        # UPSERT survey response (update if exists, insert if not)
+        merge_query = """
+        MERGE INTO SURVEY_RESPONSES t
+        USING (SELECT :student_id as STUDENT_ID, :survey_type as SURVEY_TYPE FROM DUAL) s
+        ON (t.STUDENT_ID = s.STUDENT_ID AND t.SURVEY_TYPE = s.SURVEY_TYPE)
+        WHEN MATCHED THEN
+            UPDATE SET t.RATING = :rating, t.WHAT_LIKED = :what_liked, t.WHAT_BETTER = :what_better, t.COMMENTS = :comments
+        WHEN NOT MATCHED THEN
+            INSERT (STUDENT_ID, SURVEY_TYPE, RATING, WHAT_LIKED, WHAT_BETTER, COMMENTS)
+            VALUES (:student_id, :survey_type, :rating, :what_liked, :what_better, :comments)
         """
-
-        db.execute_dml(insert_query, {
+        db.execute_dml(merge_query, {
             "student_id": survey_data.student_id,
             "survey_type": survey_data.survey_type,
             "rating": survey_data.rating,
@@ -53,7 +80,7 @@ async def submit_session_survey(survey_data: SurveyResponseCreate):
             "comments": survey_data.comments
         })
 
-        return {"message": "Survey response submitted successfully"}
+        return {"message": "Survey response updated successfully"}
 
     except HTTPException:
         raise

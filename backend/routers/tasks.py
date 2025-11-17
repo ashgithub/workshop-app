@@ -6,7 +6,7 @@ from typing import List
 import logging
 
 from ..database import db
-from ..schemas import Task, TaskCreate, TaskUpdate
+from ..schemas import Task, TaskCreate, TaskUpdate, TaskCompletionUpdate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ async def get_student_tasks(student_id: str):
 
 
 @router.post("/{student_id}")
-async def update_task_completion(student_id: str, task_data: TaskCreate):
+async def update_task_completion(student_id: str, task_data: TaskCompletionUpdate):
     """
     Update task completion status.
     Creates task if it doesn't exist.
