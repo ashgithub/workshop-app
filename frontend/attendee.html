@@ -18,7 +18,7 @@
                     <p>Student ID: <span id="student-id"></span></p>
                     <p id="attendee-email"></p>
                     <div id="location-details"></div>
-                    <img id="agenda-img" class="agenda-image" src="" alt="Agenda" style="display: none;">
+                    <button id="view-agenda-btn" class="btn-secondary" style="display: none; margin-top: 10px;">View Agenda</button>
                 </div>
             </div>
 
@@ -54,6 +54,14 @@
             </div>
         </div>
     </div>
+    <!-- Agenda Modal -->
+    <div id="agenda-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <img id="modal-img" src="" alt="Agenda">
+        </div>
+    </div>
+
     <script src="js/attendee.js"></script>
 </body>
 </html>

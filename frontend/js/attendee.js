@@ -733,19 +733,23 @@ function updateAttendeeProfile(attendee) {
         emailElement.textContent = attendee.email_address;
     }
 
-    // Update location details and agenda image
+    // Update location details and agenda button
     const locationDetails = document.getElementById('location-details');
-    const agendaImg = document.getElementById('agenda-img');
+    const viewAgendaBtn = document.getElementById('view-agenda-btn');
     if (attendee.location) {
         locationDetails.innerHTML = `
-            <p>Location: ${attendee.location.name} - [${attendee.location.room}]</p>
+            <p>Location: ${attendee.location.name} (${attendee.location.code}) - ${attendee.location.room}</p>
             <p>Meeting Time: ${attendee.location.meeting_time}</p>
         `;
-        agendaImg.src = attendee.location.agenda_image_path;
-        agendaImg.style.display = 'block';
+        if (attendee.location.agenda_image_path) {
+            viewAgendaBtn.style.display = 'block';
+            viewAgendaBtn.onclick = () => showAgenda(attendee.location.agenda_image_path);
+        } else {
+            viewAgendaBtn.style.display = 'none';
+        }
     } else {
         locationDetails.innerHTML = '<p>Location: TBD</p>';
-        agendaImg.style.display = 'none';
+        viewAgendaBtn.style.display = 'none';
     }
 
     // Update profile image
@@ -759,6 +763,33 @@ function updateAttendeeProfile(attendee) {
         imgElement.src = 'static/images/default-avatar.svg';
     }
 }
+
+// Modal functions
+function showAgenda(imagePath) {
+    const modal = document.getElementById('agenda-modal');
+    const modalImg = document.getElementById('modal-img');
+    modalImg.src = imagePath;
+    modal.style.display = 'block';
+}
+
+function closeModal() {
+    const modal = document.getElementById('agenda-modal');
+    modal.style.display = 'none';
+}
+
+// Event listener for close button
+document.addEventListener('DOMContentLoaded', function() {
+    const closeBtn = document.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.onclick = closeModal;
+    }
+    window.onclick = function(event) {
+        const modal = document.getElementById('agenda-modal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+});
 
 function showSuccess(message) {
     // Simple success notification
