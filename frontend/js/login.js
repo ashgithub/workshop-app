@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchAutocomplete(query) {
         try {
-            const response = await fetch(`/api/attendees/autocomplete?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`api/attendees/autocomplete?q=${encodeURIComponent(query)}`);
             if (response.ok) {
                 const data = await response.json();
                 showAutocomplete(data.emails);
