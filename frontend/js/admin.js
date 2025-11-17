@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (query) {
                 queryResults.innerHTML = '<p>Processing query...</p>';
                 try {
-                    const response = await fetch('/api/admin/query', {
+                    const response = await fetch('api/admin/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ query: query })
@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (location) {
                 gameProgress.style.display = 'inline'; // Show the badge
                 try {
-                    const response = await fetch(`/api/admin/game/progress?location=${location}`);
+                    const response = await fetch(`api/admin/game/progress?location=${location}`);
                     if (response.ok) {
                         const data = await response.json();
                         gameProgress.innerHTML = data.progress;
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const response = await fetch(`/api/admin/game/reset?location=${location}`, {
+                const response = await fetch(`api/admin/game/reset?location=${location}`, {
                     method: 'PUT'
                 });
                 if (response.ok) {
@@ -162,7 +162,7 @@ async function loadAdminData() {
         console.log('Loading admin data...');
 
         // Load admin profile
-        const profileResponse = await fetch('/api/attendees/ADMIN_USER');
+        const profileResponse = await fetch('api/attendees/ADMIN_USER');
         if (profileResponse.ok) {
             const adminData = await profileResponse.json();
             console.log('Admin data loaded:', adminData);
@@ -212,7 +212,7 @@ async function updateAttendeesList(filterParams = '') {
     }
 
     try {
-        const response = await fetch(`/api/admin/attendees${filterParams}`);
+        const response = await fetch(`api/admin/attendees${filterParams}`);
         if (!response.ok) {
             throw new Error('Failed to fetch attendees');
         }
@@ -300,7 +300,7 @@ async function loadLocations() {
     const locationSelectFilter = document.getElementById('filter-location');
 
     try {
-        const response = await fetch('/api/admin/locations');
+        const response = await fetch('api/admin/locations');
         if (response.ok) {
             const data = await response.json();
             
@@ -389,7 +389,7 @@ async function loadNextAttendee() {
     gameDisplay.innerHTML = '<p>Loading next attendee...</p>';
 
     try {
-        const response = await fetch(`/api/admin/game/next?location=${currentLocation}`);
+        const response = await fetch(`api/admin/game/next?location=${currentLocation}`);
         if (!response.ok) {
             throw new Error('Failed to fetch attendee');
         }
@@ -407,8 +407,8 @@ async function loadNextAttendee() {
 }
 
 function displayAttendee(attendee) {
-    const imageHtml = attendee.image_filename ? 
-        `<img src="/api/attendees/${attendee.student_id}/image" alt="Profile Image" class="profile-image" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; align-self: flex-start;">` : 
+    const imageHtml = attendee.image_filename ?
+        `<img src="api/attendees/${attendee.student_id}/image" alt="Profile Image" class="profile-image" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; align-self: flex-start;">` :
         '<div class="no-image" style="width: 120px; height: 120px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; align-self: flex-start; color: #9ca3af; font-size: 48px;">👤</div>';
 
     let introHtml;
@@ -466,7 +466,7 @@ function displayAttendee(attendee) {
         markBtn.addEventListener('click', async function() {
             const studentId = this.dataset.id;
             try {
-                const putResponse = await fetch(`/api/admin/game/played/${studentId}`, {
+                const putResponse = await fetch(`api/admin/game/played/${studentId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' }
                 });
