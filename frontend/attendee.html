@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Survey - Attendee Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="attendee-portal">
+            <h1>Workshop Attendee Portal</h1>
+            <p>Welcome to your workshop dashboard!</p>
+            <p>Student ID: <span id="student-id"></span></p>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="progress">Progress Overview</button>
+                <button class="tab-btn" data-tab="introduction">Introduction</button>
+                <button class="tab-btn" data-tab="tasks">Onboarding Tasks</button>
+                <button class="tab-btn" data-tab="surveys">Surveys</button>
+            </div>
+
+            <div id="progress-tab" class="tab-content active">
+                <h2>Progress Overview</h2>
+                <p>Your workshop progress will be displayed here.</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 25%"></div>
+                </div>
+                <p>25% Complete</p>
+            </div>
+
+            <div id="introduction-tab" class="tab-content">
+                <h2>Introduction</h2>
+                <p>Your introduction form will be implemented here.</p>
+            </div>
+
+            <div id="tasks-tab" class="tab-content">
+                <h2>Onboarding Tasks</h2>
+                <p>Your task checklist will be implemented here.</p>
+            </div>
+
+            <div id="surveys-tab" class="tab-content">
+                <h2>Surveys</h2>
+                <p>Your survey forms will be implemented here.</p>
+            </div>
+        </div>
+    </div>
+    <script src="js/attendee.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Survey - Admin Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="admin-dashboard">
+            <h1>Workshop Admin Dashboard</h1>
+            <p>Manage workshop attendees and view analytics.</p>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="attendees">Attendee List</button>
+                <button class="tab-btn" data-tab="queries">Natural Language Queries</button>
+                <button class="tab-btn" data-tab="game">2 Truths and a Lie Game</button>
+            </div>
+
+            <div id="attendees-tab" class="tab-content active">
+                <h2>Attendee List</h2>
+                <p>Attendee management table will be implemented here.</p>
+                <button class="btn-primary">Export to CSV</button>
+            </div>
+
+            <div id="queries-tab" class="tab-content">
+                <h2>Natural Language Queries</h2>
+                <p>Ask questions about your workshop data.</p>
+                <div class="query-form">
+                    <input type="text" placeholder="How many people completed onboarding?" id="query-input">
+                    <button class="btn-primary" id="query-btn">Ask Question</button>
+                </div>
+                <div id="query-results"></div>
+            </div>
+
+            <div id="game-tab" class="tab-content">
+                <h2>2 Truths and a Lie Game</h2>
+                <p>Interactive icebreaker game for workshop attendees.</p>
+                <div class="game-controls">
+                    <select id="location-select">
+                        <option value="">Select Location</option>
+                    </select>
+                    <button class="btn-primary" id="start-game-btn">Start Game</button>
+                </div>
+                <div id="game-display"></div>
+            </div>
+        </div>
+    </div>
+    <script src="js/admin.js"></script>
+</body>
+</html>

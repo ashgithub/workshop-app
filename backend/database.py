@@ -61,7 +61,7 @@ class DatabaseConnection:
             if connection:
                 self.pool.release(connection)
 
-    def execute_query(self, query: str, params: Optional[tuple] = None, fetch: bool = True):
+    def execute_query(self, query: str, params: Optional[tuple | dict] = None, fetch: bool = True):
         """Execute a SELECT query and return results."""
         with self.get_connection() as conn:
             with conn.cursor() as cursor:

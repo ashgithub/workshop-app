@@ -17,6 +17,13 @@ sys.path.insert(0, str(parent_dir))
 from backend.config import config
 from backend.database import db
 
+try:
+    from backend.routers.auth import router as auth_router
+    print("Auth router imported successfully")
+except ImportError as e:
+    print(f"Failed to import auth router: {e}")
+    auth_router = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,17 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-static_path = Path(config.static_dir)
-static_path.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
-
-# Mount frontend files
-frontend_path = Path(__file__).parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
-
-
+# Define API routes first (before static file mounts)
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
@@ -77,6 +74,24 @@ async def health_check():
         "version": "1.0.0"
     }
 
+
+# Include routers
+if auth_router:
+    app.include_router(auth_router, prefix="/api", tags=["authentication"])
+    print("Auth router registered successfully")
+else:
+    print("Auth router not available")
+
+
+# Mount static files (after API routes to avoid conflicts)
+static_path = Path(config.static_dir)
+static_path.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
+
+# Mount frontend files (must be last)
+frontend_path = Path(__file__).parent.parent / "frontend"
+if frontend_path.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 # Export app for uvicorn
 __all__ = ["app"]
