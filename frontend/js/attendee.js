@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadAttendeeData(studentId) {
     try {
         console.log('Loading attendee data for:', studentId);
-        const response = await fetch(`/api/attendees/${studentId}`);
+        const response = await fetch(`api/attendees/${studentId}`);
 
         if (!response.ok) {
             throw new Error(`Failed to load attendee data: ${response.status}`);
@@ -192,7 +192,7 @@ async function saveIntroduction(studentId) {
     };
 
     try {
-        const response = await fetch(`/api/attendees/${studentId}`, {
+        const response = await fetch(`api/attendees/${studentId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -215,7 +215,7 @@ async function saveIntroduction(studentId) {
 
 async function loadTasksData(studentId, attendee) {
     try {
-        const response = await fetch(`/api/tasks/${studentId}`);
+        const response = await fetch(`api/tasks/${studentId}`);
         if (response.ok) {
             const tasks = await response.json();
             updateTasksSection(tasks, studentId, attendee);
@@ -298,7 +298,7 @@ function updateTasksSection(tasks, studentId, attendee) {
 
 async function updateTaskCompletion(studentId, taskCode, completed) {
     try {
-        const response = await fetch(`/api/tasks/${studentId}`, {
+        const response = await fetch(`api/tasks/${studentId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -334,7 +334,7 @@ async function saveOnboardingComments(studentId) {
     };
 
     try {
-        const response = await fetch(`/api/attendees/${studentId}`, {
+        const response = await fetch(`api/attendees/${studentId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -475,7 +475,7 @@ function updateSurveysSection(attendee) {
         sessionSurveys.forEach((survey) => {
             const loadingDiv = document.getElementById(`${survey.code}-loading`);
             if (loadingDiv) loadingDiv.style.display = "block";
-            fetch(`/api/surveys/?student_id=${encodeURIComponent(studentId)}&survey_type=${encodeURIComponent(survey.code)}`)
+            fetch(`api/surveys/?student_id=${encodeURIComponent(studentId)}&survey_type=${encodeURIComponent(survey.code)}`)
                 .then(resp => {
                     if (!resp.ok) throw new Error(`Failed to get previous survey`);
                     return resp.json();
@@ -635,7 +635,7 @@ async function submitSessionSurveys(studentId) {
         // Only submit if at least rating is provided
         if (rating) {
             try {
-                const response = await fetch('/api/surveys/', {
+                const response = await fetch('api/surveys/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -682,7 +682,7 @@ async function submitOverallFeedback(studentId) {
     }
 
     try {
-        const response = await fetch('/api/surveys/overall', {
+        const response = await fetch('api/surveys/overall', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -768,7 +768,7 @@ async function submitIndividualSurvey(studentId, surveyCode) {
             const comments = document.getElementById('overall-comments').value.trim();
             const futureIdeas = document.getElementById('overall-future').value.trim();
 
-            response = await fetch('/api/surveys/overall', {
+            response = await fetch('api/surveys/overall', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -782,7 +782,7 @@ async function submitIndividualSurvey(studentId, surveyCode) {
             });
         } else {
             // Individual session survey
-            response = await fetch('/api/surveys/', {
+            response = await fetch('api/surveys/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

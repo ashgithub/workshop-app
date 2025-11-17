@@ -37,9 +37,6 @@ Thumbs.db
 *.log
 logs/
 
-# test files
-test_.sh
-
 
 # Database files (if any local SQLite files)
 *.db
