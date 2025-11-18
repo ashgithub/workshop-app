@@ -23,6 +23,7 @@ class StudentBase(BaseModel):
     team: Optional[str] = None
     face_image: Optional[str] = None
     mac_pc: Optional[str] = Field(None, pattern=r'^[MP]$')
+    tshirt_size: Optional[str] = Field(None, max_length=10)
     image_filename: Optional[str] = None
     onboarding_comments: Optional[str] = None
     played_2t1l: Optional[str] = Field('N', pattern=r'^[YN]$')
@@ -44,6 +45,7 @@ class StudentUpdate(BaseModel):
     ack: Optional[str] = Field(None, pattern=r'^[YN]$')
     team: Optional[str] = None
     mac_pc: Optional[str] = Field(None, pattern=r'^[MP]$')
+    tshirt_size: Optional[str] = Field(None, max_length=10)
     onboarding_comments: Optional[str] = None
 
 
@@ -131,7 +133,7 @@ class IntroProgress(BaseModel):
     intro_completed: bool
     truths_completed: bool
     device_completed: bool
-
+    tshirt_completed: bool
 class ProgressInfo(BaseModel):
     ack_completed: bool
     intro_completed: bool

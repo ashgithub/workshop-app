@@ -21,9 +21,11 @@ def calculate_progress(student_id: str) -> dict:
         ack_result = db.execute_query(ack_query, {"id": student_id})
         ack_completed = ack_result and ack_result[0][0] == 'Y'
 
-        # Check intro completion (TEAM, INTRO, TL1, TL2, TL3, MAC_PC filled)
-        intro_query = "SELECT TEAM, INTRO, TL1, TL2, TL3, MAC_PC FROM STUDENTS WHERE STUDENT_ID = :id"
+        # Check intro completion (TEAM, INTRO, TL1, TL2, TL3, MAC_PC, TSHIRT_SIZE filled)
+        intro_query = "SELECT TEAM, INTRO, TL1, TL2, TL3, MAC_PC, TSHIRT_SIZE FROM STUDENTS WHERE STUDENT_ID = :id"
         intro_result = db.execute_query(intro_query, {"id": student_id})
+
+
 
         # Individual field completions
         team_completed = bool(intro_result and intro_result[0][0] and intro_result[0][0].strip())
@@ -33,10 +35,11 @@ def calculate_progress(student_id: str) -> dict:
                                intro_result[0][3] and intro_result[0][3].strip() and
                                intro_result[0][4] and intro_result[0][4].strip())
         device_completed = bool(intro_result and intro_result[0][5] and intro_result[0][5].strip())
+        tshirt_completed = bool(intro_result and intro_result[0][6] and intro_result[0][6].strip())
 
         # Count completed intro fields
-        intro_fields_completed = sum([team_completed, intro_text_completed, truths_completed, device_completed])
-        intro_fields_total = 4
+        intro_fields_completed = sum([team_completed, intro_text_completed, truths_completed, device_completed, tshirt_completed])
+        intro_fields_total = 5
 
         # Overall intro completion
         intro_completed = intro_fields_completed == intro_fields_total
@@ -87,7 +90,8 @@ def calculate_progress(student_id: str) -> dict:
                 "team_completed": team_completed,
                 "intro_completed": intro_text_completed,
                 "truths_completed": truths_completed,
-                "device_completed": device_completed
+                "device_completed": device_completed,
+                "tshirt_completed": tshirt_completed
             },
             "tasks_completed": tasks_completed,
             "tasks_total": tasks_total,
@@ -103,12 +107,13 @@ def calculate_progress(student_id: str) -> dict:
             "ack_completed": False,
             "intro_completed": False,
             "intro_fields_completed": 0,
-            "intro_fields_total": 4,
+            "intro_fields_total": 5,
             "intro_details": {
                 "team_completed": False,
                 "intro_completed": False,
                 "truths_completed": False,
-                "device_completed": False
+                "device_completed": False,
+                "tshirt_completed": False
             },
             "tasks_completed": 0,
             "tasks_total": 11,
@@ -144,6 +149,7 @@ async def get_attendee(student_id: str):
                 "team": None,
                 "face_image": None,
                 "mac_pc": None,
+                "tshirt_size": None,
                 "image_filename": None,
                 "onboarding_comments": None,
                 "played_2t1l": None,
@@ -156,12 +162,13 @@ async def get_attendee(student_id: str):
                 "ack_completed": False,
                 "intro_completed": False,
                 "intro_fields_completed": 0,
-                "intro_fields_total": 4,
+                "intro_fields_total": 5,
                 "intro_details": {
                     "team_completed": False,
                     "intro_completed": False,
                     "truths_completed": False,
-                    "device_completed": False
+                    "device_completed": False,
+                    "tshirt_completed": False
                 },
                 "tasks_completed": 0,
                 "tasks_total": 0,
@@ -180,7 +187,7 @@ async def get_attendee(student_id: str):
         query = """
         SELECT s.STUDENT_ID, s.EMAIL_ADDRESS, s.NAME, s.LOCATION, s.MANAGER, s.JOB_ID,
                s.INTRO, s.TL1, s.TL2, s.TL3, s.ACK, s.ON_BOARDED, s.TF, s.TEAM, s.FACE_IMAGE,
-               s.MAC_PC, s.ONBOARDING_COMMENTS, s.PLAYED_2T1L, s.CREATED_AT, s.UPDATED_AT,
+               s.MAC_PC, s.TSHIRT_SIZE, s.ONBOARDING_COMMENTS, s.PLAYED_2T1L, s.CREATED_AT, s.UPDATED_AT,
                l.CODE, l.NAME AS LOCATION_NAME, l.ROOM, l.MEETING_TIME, l.AGENDA_IMAGE_PATH
         FROM STUDENTS s
         LEFT JOIN LOCATIONS l ON s.LOCATION = l.CODE
@@ -221,22 +228,23 @@ async def get_attendee(student_id: str):
             "team": to_str(row[13]),
             "face_image": row[14],
             "mac_pc": row[15],
+            "tshirt_size": to_str(row[16]),
             "image_filename": row[14],  # Use FACE_IMAGE as filename
-            "onboarding_comments": to_str(row[16]),
-            "played_2t1l": row[17],
-            "created_at": row[18],
-            "updated_at": row[19]
+            "onboarding_comments": to_str(row[17]),
+            "played_2t1l": row[18],
+            "created_at": row[19],
+            "updated_at": row[20]
         }
 
         # Add location details if available
-        location_code = to_str(row[20])
+        location_code = to_str(row[21])
         if location_code:
             student_data["location"] = {
                 "code": location_code,
-                "name": to_str(row[21]) or "Unknown",
-                "room": to_str(row[22]) or "TBD",
-                "meeting_time": to_str(row[23]) or "TBD",
-                "agenda_image_path": to_str(row[24]) or ""
+                "name": to_str(row[22]) or "Unknown",
+                "room": to_str(row[23]) or "TBD",
+                "meeting_time": to_str(row[24]) or "TBD",
+                "agenda_image_path": to_str(row[25]) or ""
             }
         else:
             student_data["location"] = None
@@ -279,6 +287,7 @@ async def update_attendee(student_id: str, update_data: StudentUpdate):
             "ack": "ACK",
             "team": "TEAM",
             "mac_pc": "MAC_PC",
+            "tshirt_size": "TSHIRT_SIZE",
             "onboarding_comments": "ONBOARDING_COMMENTS"
         }
 

@@ -241,7 +241,7 @@ async function updateAttendeesList(filterParams = '') {
                             <td style="padding: 8px;">${attendee.email_address}</td>
                             <td style="padding: 8px;">${attendee.location || 'N/A'}</td>
                             <td style="padding: 8px;">${attendee.team || 'N/A'}</td>
-                            <td style="padding: 8px;">${attendee.intro_completed_count || 0}/4</td>
+                            <td style="padding: 8px;">${attendee.intro_completed_count || 0}/5</td>
                             <td style="padding: 8px;">${attendee.tasks_completed || 0}/${attendee.tasks_total || 11}</td>
                             <td style="padding: 8px;">${(attendee.surveys_completed || 0)}/${attendee.surveys_total || 11}</td>
                             <td style="padding: 8px;">${attendee.ack === 'Y' ? 'Yes' : 'No'}</td>
@@ -278,7 +278,7 @@ function exportToCSV(attendees) {
             attendee.email_address,
             attendee.location || '',
             attendee.team || '',
-            `${attendee.intro_completed_count || 0}/4`,
+            `${attendee.intro_completed_count || 0}/5`,
             `${(attendee.tasks_completed || 0)}/${attendee.tasks_total || 11}`,
             `${(attendee.surveys_completed || 0)}/10`,
             attendee.ack === 'Y' ? 'Yes' : 'No',

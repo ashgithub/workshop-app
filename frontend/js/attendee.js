@@ -117,9 +117,9 @@ function updateIntroductionSection(attendee) {
     const ackCompleted = attendee.ack === 'Y' ? 1 : 0;
     const ackTotal = 1;
 
-    // Introduction section: 4 items (team, intro text, truths/lies, device)
+    // Introduction section: 5 items (team, intro text, truths/lies, device, tshirt_size)
     let introCompletedCount = 0;
-    const introTotal = 4;
+    const introTotal = 5;
 
     if (attendee.team && attendee.team.trim()) introCompletedCount++;
     if (attendee.intro && attendee.intro.trim()) introCompletedCount++;
@@ -127,6 +127,7 @@ function updateIntroductionSection(attendee) {
         (attendee.tl2 && attendee.tl2.trim()) &&
         (attendee.tl3 && attendee.tl3.trim())) introCompletedCount++;
     if (attendee.mac_pc) introCompletedCount++;
+    if (attendee.tshirt_size) introCompletedCount++;
 
     const introHtml = `
         <h2>Introduction</h2>
@@ -168,6 +169,13 @@ function updateIntroductionSection(attendee) {
                     <label><input type="radio" name="device" value="M" ${attendee.mac_pc === 'M' ? 'checked' : ''}> Mac</label>
                     <label><input type="radio" name="device" value="P" ${attendee.mac_pc === 'P' ? 'checked' : ''}> PC</label>
                 </div>
+
+                <div class="form-group ${attendee.tshirt_size ? 'completed' : ''}">
+                    <label>5. T-shirt Size:</label>
+                    <label><input type="radio" name="tshirt_size" value="M" ${attendee.tshirt_size === 'M' ? 'checked' : ''}> Medium</label>
+                    <label><input type="radio" name="tshirt_size" value="L" ${attendee.tshirt_size === 'L' ? 'checked' : ''}> Large</label>
+                    <label><input type="radio" name="tshirt_size" value="XL" ${attendee.tshirt_size === 'XL' ? 'checked' : ''}> X-Large</label>
+                </div>
             </div>
         </div>
 
@@ -175,6 +183,8 @@ function updateIntroductionSection(attendee) {
     `;
 
     introTab.innerHTML = introHtml;
+
+    console.log('Intro HTML set, contains T-shirt Size:', introTab.innerHTML.includes('T-shirt Size'));
 
     // Add save functionality
     document.getElementById('save-intro-btn').addEventListener('click', () => saveIntroduction(attendee.student_id));
@@ -188,7 +198,8 @@ async function saveIntroduction(studentId) {
         tl2: document.getElementById('tl2-input').value.trim(),
         tl3: document.getElementById('tl3-input').value.trim(),
         intro: document.getElementById('intro-textarea').value.trim(),
-        mac_pc: document.querySelector('input[name="device"]:checked')?.value
+        mac_pc: document.querySelector('input[name="device"]:checked')?.value,
+        tshirt_size: document.querySelector('input[name="tshirt_size"]:checked')?.value
     };
 
     try {

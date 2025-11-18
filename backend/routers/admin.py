@@ -108,7 +108,8 @@ async def get_all_attendees(
                 CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0
                         AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0
                         AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END
+                CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END +
+                CASE WHEN s.TSHIRT_SIZE IS NOT NULL AND LENGTH(TRIM(s.TSHIRT_SIZE)) > 0 THEN 1 ELSE 0 END
             ) <= :intro_lt""")
             params["intro_lt"] = intro_lt
 
@@ -149,7 +150,7 @@ async def get_all_attendees(
         else:
             sort_field = "s.NAME"
 
-        order_by = f"ORDER BY {sort_field} {order.upper()}"
+        order_by = f"ORDER BY {sort_field} {(order or 'asc').upper()}"
 
         full_query = base_query.format(intro_count=intro_count_subquery) + f" AND {where_clause}" if where_clause else base_query.format(intro_count=intro_count_subquery)
         full_query += f" {order_by}"
