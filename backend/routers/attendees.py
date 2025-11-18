@@ -246,7 +246,7 @@ async def get_attendee(student_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.put("/{student_id}", response_model=Student)
+@router.put("/{student_id}", response_model=StudentWithProgress)
 async def update_attendee(student_id: str, update_data: StudentUpdate):
     """
     Update attendee information.
