@@ -54,3 +54,4 @@ htmlcov/
 
 # Static files (if generated)
 backend/static/images/
+frontend/images/
