@@ -194,39 +194,49 @@ async def get_attendee(student_id: str):
 
         row = result[0]
 
+        def to_str(value):
+            if value is None:
+                return None
+            if hasattr(value, 'read'):
+                content = value.read()
+                if isinstance(content, bytes):
+                    return content.decode('utf-8', errors='ignore')
+                return content
+            return value
+
         student_data = {
             "student_id": row[0],
             "email_address": row[1],
-            "name": row[2],
+            "name": to_str(row[2]),
             "location": row[3],
-            "manager": row[4],
-            "job_id": row[5],
-            "intro": row[6],
-            "tl1": row[7],
-            "tl2": row[8],
-            "tl3": row[9],
+            "manager": to_str(row[4]),
+            "job_id": to_str(row[5]),
+            "intro": to_str(row[6]),
+            "tl1": to_str(row[7]),
+            "tl2": to_str(row[8]),
+            "tl3": to_str(row[9]),
             "ack": row[10],
             "on_boarded": row[11],
             "tf": row[12],
-            "team": row[13],
+            "team": to_str(row[13]),
             "face_image": row[14],
             "mac_pc": row[15],
             "image_filename": row[14],  # Use FACE_IMAGE as filename
-            "onboarding_comments": row[16],
+            "onboarding_comments": to_str(row[16]),
             "played_2t1l": row[17],
             "created_at": row[18],
             "updated_at": row[19]
         }
 
         # Add location details if available
-        location_code = row[20]
+        location_code = to_str(row[20])
         if location_code:
             student_data["location"] = {
                 "code": location_code,
-                "name": row[21] or "Unknown",
-                "room": row[22] or "TBD",
-                "meeting_time": row[23] or "TBD",
-                "agenda_image_path": row[24] or ""
+                "name": to_str(row[21]) or "Unknown",
+                "room": to_str(row[22]) or "TBD",
+                "meeting_time": to_str(row[23]) or "TBD",
+                "agenda_image_path": to_str(row[24]) or ""
             }
         else:
             student_data["location"] = None
