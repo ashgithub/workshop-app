@@ -8,9 +8,36 @@ import os
 
 from ..database import db
 from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
+import select_ai
+from ..config import config
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Global SELECT AI profile instance
+_select_ai_profile = None
+
+def get_select_ai_profile():
+    """Get or create the SELECT AI profile instance."""
+    global _select_ai_profile
+    if _select_ai_profile is None:
+        try:
+            # Connect to Oracle using existing database credentials
+            select_ai.connect(
+                user=config.oracle_user,
+                password=config.oracle_password,
+                dsn=config.oracle_dsn,
+                config_dir=config.oracle_wallet,
+                wallet_location=config.oracle_wallet,
+                wallet_password=config.oracle_wallet_pass,
+            )
+            # Create AI profile
+            _select_ai_profile = select_ai.Profile(profile_name=config.oracle_select_ai_profile)
+            logger.info(f"Oracle SELECT AI profile '{config.oracle_select_ai_profile}' initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Oracle SELECT AI profile: {e}")
+            raise HTTPException(status_code=500, detail="Natural language query service unavailable")
+    return _select_ai_profile
 
 
 @router.get("/attendees")
@@ -202,115 +229,37 @@ async def get_all_attendees(
 @router.post("/query", response_model=AdminQueryResponse)
 async def execute_natural_language_query(query_request: AdminQueryRequest):
     """
-    Execute natural language query converted to SQL.
-    For now, return a placeholder response - full NL to SQL implementation would require LangChain setup.
+    Execute natural language query using Oracle SELECT AI.
     """
     try:
-        # Placeholder implementation - in full implementation, this would:
-        # 1. Use LangChain with OpenAI to convert NL to SQL
-        # 2. Validate the generated SQL is read-only
-        # 3. Execute the query safely
+        # Get the SELECT AI profile
+        profile = get_select_ai_profile()
 
-        query = query_request.query.lower()
+        # Execute the natural language query
+        df = profile.run_sql(prompt=query_request.query)
 
-        # Simple keyword-based responses for common queries
-        if "completed onboarding" in query or "onboarding completed" in query:
-            result = db.execute_query("""
-                SELECT COUNT(*) as completed_count
-                FROM STUDENTS
-                WHERE ON_BOARDED = 'Y'
-            """)
-            count = result[0][0] if result else 0
-            return AdminQueryResponse(
-                query=query_request.query,
-                results=[{"completed_onboarding": count}],
-                summary=f"{count} attendees have completed onboarding"
-            )
+        # Convert DataFrame to list of dictionaries
+        results = []
+        if not df.empty:
+            results = df.to_dict('records')
 
-        elif "location" in query and "haven't finished" in query:
-            # Extract location from query - simplified
-            location = None
-            if "austin" in query.lower():
-                location = "AUS"
-            elif "seattle" in query.lower():
-                location = "SEA"
-            # Add more location mappings as needed
+        # Generate a summary based on the results
+        if df.empty:
+            summary = "No results found for the query"
+        else:
+            num_rows = len(df)
+            num_cols = len(df.columns)
+            summary = f"Found {num_rows} result{'s' if num_rows != 1 else ''} with {num_cols} column{'s' if num_cols != 1 else ''}"
 
-            if location:
-                result = db.execute_query("""
-                    SELECT COUNT(*) as incomplete_count
-                    FROM STUDENTS s
-                    LEFT JOIN (
-                        SELECT STUDENT_ID, COUNT(CASE WHEN COMPLETED = 'Y' THEN 1 END) as completed_tasks
-                        FROM ONBOARDING_TASKS
-                        GROUP BY STUDENT_ID
-                    ) t ON s.STUDENT_ID = t.STUDENT_ID
-                    WHERE s.LOCATION = :location
-                    AND (s.ON_BOARDED != 'Y' OR s.ON_BOARDED IS NULL)
-                """, {"location": location})
-                count = result[0][0] if result else 0
-                return AdminQueryResponse(
-                    query=query_request.query,
-                    results=[{"incomplete_from_location": count}],
-                    summary=f"{count} attendees from {location} haven't finished onboarding"
-                )
-
-        elif "average rating" in query and "rag" in query.lower():
-            result = db.execute_query("""
-                SELECT ROUND(AVG(RATING), 1) as avg_rating, COUNT(*) as response_count
-                FROM SURVEY_RESPONSES
-                WHERE SURVEY_TYPE = 'rag'
-            """)
-            if result and result[0][0]:
-                avg_rating = result[0][0]
-                count = result[0][1]
-                return AdminQueryResponse(
-                    query=query_request.query,
-                    results=[{"average_rating": float(avg_rating), "responses": count}],
-                    summary=f"Average RAG session rating: {avg_rating}/5 from {count} responses"
-                )
-
-        elif "mac users" in query.lower():
-            result = db.execute_query("""
-                SELECT COUNT(*) as mac_users
-                FROM STUDENTS
-                WHERE MAC_PC = 'M'
-            """)
-            count = result[0][0] if result else 0
-            return AdminQueryResponse(
-                query=query_request.query,
-                results=[{"mac_users": count}],
-                summary=f"{count} attendees are Mac users"
-            )
-
-        elif "feedback mentioning" in query and "confusing" in query.lower():
-            result = db.execute_query("""
-                SELECT COUNT(*) as confusing_mentions
-                FROM (
-                    SELECT WHAT_BETTER FROM SURVEY_RESPONSES WHERE LOWER(WHAT_BETTER) LIKE '%confusing%'
-                    UNION ALL
-                    SELECT COMMENTS FROM SURVEY_RESPONSES WHERE LOWER(COMMENTS) LIKE '%confusing%'
-                    UNION ALL
-                    SELECT OVERALL_COMMENTS FROM WORKSHOP_FEEDBACK WHERE LOWER(OVERALL_COMMENTS) LIKE '%confusing%'
-                )
-            """)
-            count = result[0][0] if result else 0
-            return AdminQueryResponse(
-                query=query_request.query,
-                results=[{"confusing_mentions": count}],
-                summary=f"{count} feedback responses mention 'confusing'"
-            )
-
-        # Default response for unrecognized queries
         return AdminQueryResponse(
             query=query_request.query,
-            results=[],
-            summary="Query not recognized. Try queries like 'How many people completed onboarding?' or 'Show me attendees from Austin who haven't finished'"
+            results=results,
+            summary=summary
         )
 
     except Exception as e:
-        logger.error(f"Error executing query '{query_request.query}': {e}")
-        raise HTTPException(status_code=500, detail="Query execution failed")
+        logger.error(f"Error executing natural language query '{query_request.query}': {e}")
+        raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
 
 
 @router.get("/locations")
