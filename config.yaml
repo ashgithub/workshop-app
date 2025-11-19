@@ -1,10 +1,11 @@
 # Workshop Survey Configuration
 database:
-  wallet: $ORACLE_WALLET 
-  wallet_pass: $ORACLE_WALLET_PASS 
+  wallet: $ORACLE_WALLET
+  wallet_pass: $ORACLE_WALLET_PASS
   user: $ORACLE_USER  # Will be replaced with environment variable
   password: $ORACLE_PASSWORD
   dsn: $ORACLE_DSN  # e.g., "host:port/service_name"
+  select_ai_profile: workshop_app_profile
 
 openai:
   api_key: $OPENAI_API_KEY

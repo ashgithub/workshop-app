@@ -52,6 +52,10 @@ class Config:
         return self._config.get('database', {}).get('wallet_pass')
 
     @property
+    def oracle_select_ai_profile(self) -> str:
+        return self._config.get('database', {}).get('select_ai_profile', 'oci_ai_profile')
+
+    @property
     def openai_api_key(self) -> str:
         return self._config.get('openai', {}).get('api_key', '')
 

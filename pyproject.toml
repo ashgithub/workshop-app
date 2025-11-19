@@ -16,6 +16,7 @@ dependencies = [
     "httpx>=0.25.0",
     "envyaml>=1.10.0",
     "pyyaml>=6.0.0",
+    "select-ai>=1.2.0",
 ]
 
 [tool.hatch.build.targets.wheel]
