@@ -383,6 +383,28 @@ async function clearFilters() {
     await updateAttendeesList('');
 }
 
+async function updateGameProgress() {
+    if (!currentLocation || !gameProgress) return;
+
+    try {
+        const response = await fetch(`api/admin/game/progress?location=${currentLocation}`);
+        if (response.ok) {
+            const data = await response.json();
+            gameProgress.innerHTML = data.progress;
+            if (data.total === 0) {
+                gameProgress.innerHTML += ' (No one has statements yet – time to get those truths flowing!)';
+            } else if (data.played === data.total) {
+                gameProgress.innerHTML += ' (All truths revealed! Ready for a rematch? Will present live!)';
+            }
+        } else {
+            gameProgress.innerHTML = '?/?';
+        }
+    } catch (error) {
+        console.error('Error updating progress:', error);
+        gameProgress.innerHTML = '?/?';
+    }
+}
+
 async function loadNextAttendee() {
     if (!currentLocation) return;
 
@@ -472,6 +494,7 @@ function displayAttendee(attendee) {
                 });
                 if (putResponse.ok) {
                     console.log('Marked as played');
+                    await updateGameProgress(); // Refresh progress indicator
                     await loadNextAttendee();
                 } else {
                     alert('Error marking as played. Please try again.');
