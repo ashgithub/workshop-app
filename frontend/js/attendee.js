@@ -383,34 +383,12 @@ function updateSurveysSection(attendee) {
         { code: 'dev_productivity', name: 'Dev Productivity', shortName: 'Dev Tools' }
     ];
 
-    // Compute completed surveys from attendee.progress
-    const progress = attendee.progress;
-    let surveysCompleted = 0;
+    // Initialize completed surveys map - will be populated from actual submission checks
     let completedMap = {};
-
-    // For each session survey, check if completed (using progress or fallback)
-    if (progress && progress.intro_details) {
-        sessionSurveys.forEach((survey) => {
-            if (progress[`survey_${survey.code}_completed`] !== undefined) {
-                completedMap[survey.code] = !!progress[`survey_${survey.code}_completed`];
-            } else if (progress[`surveys_completed`] !== undefined) {
-                // progressive fallback for demo: If progress.surveys_completed >= n, count n as done
-                completedMap[survey.code] = false;
-            }
-            // We'll do live validation later
-        });
-    }
-
-    // If attendee.surveys_completed exists & is a number, reflect in completedMap
-    if (progress && typeof progress.surveys_completed === "number") {
-        // Just assume the first N are completed
-        for (let i = 0; i < progress.surveys_completed; i++) {
-            completedMap[sessionSurveys[i]?.code] = true;
-        }
-    }
-
-    // Count completed
-    surveysCompleted = Object.values(completedMap).filter(Boolean).length;
+    sessionSurveys.forEach((survey) => {
+        completedMap[survey.code] = false;  // Default to incomplete
+    });
+    let surveysCompleted = 0;
 
     // Now let's display the count in a badge
     let surveyHeaderCount = `${surveysCompleted}/${sessionSurveys.length} completed`;
@@ -481,50 +459,79 @@ function updateSurveysSection(attendee) {
     });
 
     // Client-side: After all tabs rendered above, load prior data
-    setTimeout(() => {
+    setTimeout(async () => {
         const studentId = localStorage.getItem("student_id");
-        sessionSurveys.forEach((survey) => {
+        const fetchPromises = sessionSurveys.map(async (survey) => {
             const loadingDiv = document.getElementById(`${survey.code}-loading`);
             if (loadingDiv) loadingDiv.style.display = "block";
-            fetch(`api/surveys/?student_id=${encodeURIComponent(studentId)}&survey_type=${encodeURIComponent(survey.code)}`)
-                .then(resp => {
-                    if (!resp.ok) throw new Error(`Failed to get previous survey`);
-                    return resp.json();
-                })
-                .then(data => {
-                    // Fill if data found
-                    if (data && (data.rating || data.what_liked || data.what_better)) {
-                        // Set rating buttons
-                        const ratingDiv = document.getElementById(`${survey.code}-rating`);
-                        if (ratingDiv && data.rating) {
-                            const btns = ratingDiv.querySelectorAll(".emoji-btn");
-                            btns.forEach(btn => {
-                                if (btn.getAttribute('data-rating') === String(data.rating)) {
-                                    btn.classList.add("selected");
-                                    ratingDiv.setAttribute('data-selected-rating', data.rating);
-                                    const selectedDiv = document.getElementById(`${survey.code}-selected`);
-                                    if (selectedDiv) {
-                                        selectedDiv.textContent = `Selected: ${btn.textContent} (${data.rating}/5)`;
-                                    }
+            try {
+                const resp = await fetch(`api/surveys/?student_id=${encodeURIComponent(studentId)}&survey_type=${encodeURIComponent(survey.code)}`);
+                if (!resp.ok) throw new Error(`Failed to get previous survey`);
+                const data = await resp.json();
+                // Fill if data found
+                if (data && (data.rating || data.what_liked || data.what_better || data.comments)) {
+                    completedMap[survey.code] = true;  // Mark as completed
+                    // Set rating buttons
+                    const ratingDiv = document.getElementById(`${survey.code}-rating`);
+                    if (ratingDiv && data.rating) {
+                        const btns = ratingDiv.querySelectorAll(".emoji-btn");
+                        btns.forEach(btn => {
+                            if (btn.getAttribute('data-rating') === String(data.rating)) {
+                                btn.classList.add("selected");
+                                ratingDiv.setAttribute('data-selected-rating', data.rating);
+                                const selectedDiv = document.getElementById(`${survey.code}-selected`);
+                                if (selectedDiv) {
+                                    selectedDiv.textContent = `Selected: ${btn.textContent} (${data.rating}/5)`;
                                 }
-                            });
-                        }
-                        // Set what_liked/what_better if available
-                        if (data.what_liked !== undefined) {
-                            const liked = document.getElementById(`${survey.code}-liked`);
-                            if (liked) liked.value = data.what_liked;
-                        }
-                        if (data.what_better !== undefined) {
-                            const better = document.getElementById(`${survey.code}-better`);
-                            if (better) better.value = data.what_better;
-                        }
-                        // Optionally show that data is loaded after a short timeout
-                        setTimeout(() => { if (loadingDiv) loadingDiv.style.display = "none"; }, 500);
-                    } else {
-                        if (loadingDiv) loadingDiv.style.display = "none";
+                            }
+                        });
                     }
-                })
-                .catch(() => { if (loadingDiv) loadingDiv.style.display = "none"; });
+                    // Set what_liked/what_better/comments if available
+                    if (data.what_liked !== undefined) {
+                        const liked = document.getElementById(`${survey.code}-liked`);
+                        if (liked) liked.value = data.what_liked;
+                    }
+                    if (data.what_better !== undefined) {
+                        const better = document.getElementById(`${survey.code}-better`);
+                        if (better) better.value = data.what_better;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error loading survey ${survey.code}:`, error);
+            } finally {
+                if (loadingDiv) loadingDiv.style.display = "none";
+            }
+        });
+
+        // Wait for all fetches to complete
+        await Promise.all(fetchPromises);
+
+        // Update the UI with correct completion status
+        surveysCompleted = Object.values(completedMap).filter(Boolean).length;
+        const surveyHeader = document.querySelector('.survey-tabs h2');
+        if (surveyHeader) {
+            const countSpan = surveyHeader.querySelector('.progress-indicator');
+            if (countSpan) {
+                countSpan.textContent = `${surveysCompleted}/${sessionSurveys.length} completed`;
+            }
+        }
+        // Update tab pills
+        sessionSurveys.forEach((survey) => {
+            const tabBtn = document.querySelector(`.survey-tab-btn[data-tab="${survey.code}"]`);
+            if (tabBtn) {
+                const pill = tabBtn.querySelector('.pill');
+                if (pill) {
+                    if (completedMap[survey.code]) {
+                        pill.className = 'pill pill-complete';
+                        pill.textContent = 'Complete';
+                        tabBtn.classList.add('completed');
+                    } else {
+                        pill.className = 'pill pill-pending';
+                        pill.textContent = 'Incomplete';
+                        tabBtn.classList.remove('completed');
+                    }
+                }
+            }
         });
     }, 1);
 
