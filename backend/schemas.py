@@ -110,8 +110,8 @@ class SurveyResponse(SurveyResponseBase):
 # Workshop Feedback schemas
 class WorkshopFeedbackBase(BaseModel):
     overall_rating: int = Field(..., ge=1, le=5)
-    overall_comments: Optional[str] = None
-    future_ideas: Optional[str] = None
+    overall_liked: Optional[str] = None
+    overall_better: Optional[str] = None
 
 
 class WorkshopFeedbackCreate(WorkshopFeedbackBase):

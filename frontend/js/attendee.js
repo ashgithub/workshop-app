@@ -565,12 +565,12 @@ function updateSurveysSection(attendee) {
                     <div class="selected-rating" id="overall-selected"></div>
                 </div>
                 <div class="form-group">
-                    <label>Overall comments about the workshop:</label>
-                    <textarea id="overall-comments" rows="4" placeholder="Your overall thoughts..."></textarea>
+                    <label>What did you like about the workshop?</label>
+                    <textarea id="overall-liked" rows="4" placeholder="Share what worked well..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Future workshop ideas:</label>
-                    <textarea id="overall-future" rows="3" placeholder="Suggestions for future workshops..."></textarea>
+                    <label>What could be improved?</label>
+                    <textarea id="overall-better" rows="3" placeholder="Suggestions for improvement..."></textarea>
                 </div>
                 <button class="btn-primary" data-survey="overall">Submit Overall Feedback</button>
             </div>
@@ -637,106 +637,7 @@ function updateSurveysSection(attendee) {
     });
 }
 
-async function submitSessionSurveys(studentId) {
-    const sessionSurveys = [
-        'onboarding', 'llms', 'rag', 'function_calling', 'agents',
-        'database', 'speech', 'vision', 'demos', 'dev_productivity'
-    ];
 
-    let submittedCount = 0;
-
-    for (const surveyType of sessionSurveys) {
-        const rating = document.getElementById(`${surveyType}-rating`).value;
-        const liked = document.getElementById(`${surveyType}-liked`).value.trim();
-        const better = document.getElementById(`${surveyType}-better`).value.trim();
-
-        // Only submit if at least rating is provided
-        if (rating) {
-            try {
-                const response = await fetch('api/surveys/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        student_id: studentId,
-                        survey_type: surveyType,
-                        rating: parseInt(rating),
-                        what_liked: liked,
-                        what_better: better
-                    })
-                });
-
-                if (response.ok) {
-                    submittedCount++;
-                    // Clear the form
-                    document.getElementById(`${surveyType}-rating`).value = '';
-                    document.getElementById(`${surveyType}-liked`).value = '';
-                    document.getElementById(`${surveyType}-better`).value = '';
-                }
-            } catch (error) {
-                console.error(`Error submitting ${surveyType} survey:`, error);
-            }
-        }
-    }
-
-    if (submittedCount > 0) {
-        showSuccess(`Submitted ${submittedCount} session survey(s) successfully!`);
-        // Reload data to update progress
-        loadAttendeeData(studentId);
-    } else {
-        showError('Please fill out at least one survey rating.');
-    }
-}
-
-async function submitOverallFeedback(studentId) {
-    const rating = document.getElementById('overall-rating').value;
-    const comments = document.getElementById('overall-comments').value.trim();
-    const futureIdeas = document.getElementById('future-ideas').value.trim();
-
-    if (!rating) {
-        showError('Please provide an overall rating.');
-        return;
-    }
-
-    try {
-        const response = await fetch('api/surveys/overall', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                student_id: studentId,
-                overall_rating: parseInt(rating),
-                overall_comments: comments,
-                future_ideas: futureIdeas
-            })
-        });
-
-        if (response.ok) {
-            showSuccess('Overall feedback submitted successfully!');
-            // Clear the form
-            document.getElementById('overall-rating').value = '';
-            document.getElementById('overall-comments').value = '';
-            document.getElementById('future-ideas').value = '';
-            // Reload data to update progress, but do not switch tabs
-            const activeSurveyTab = document.querySelector('.survey-tab-btn.active');
-            const activeSurvey = activeSurveyTab ? activeSurveyTab.getAttribute('data-tab') : null;
-            loadAttendeeData(studentId);
-            setTimeout(() => {
-                if (activeSurvey) {
-                    const btn = document.querySelector(`.survey-tab-btn[data-tab="${activeSurvey}"]`);
-                    if (btn && !btn.classList.contains('active')) btn.click();
-                }
-            }, 250);
-        } else {
-            throw new Error('Failed to submit feedback');
-        }
-    } catch (error) {
-        console.error('Error submitting overall feedback:', error);
-        showError('Failed to submit feedback. Please try again.');
-    }
-}
 
 function updateAttendeeProfile(attendee) {
     // Update attendee name
@@ -829,8 +730,8 @@ async function submitIndividualSurvey(studentId, surveyCode) {
         let response;
         if (surveyCode === 'overall') {
             // Overall feedback
-            const comments = document.getElementById('overall-comments').value.trim();
-            const futureIdeas = document.getElementById('overall-future').value.trim();
+            const liked = document.getElementById('overall-liked').value.trim();
+            const better = document.getElementById('overall-better').value.trim();
 
             response = await fetch('api/surveys/overall', {
                 method: 'POST',
@@ -840,8 +741,8 @@ async function submitIndividualSurvey(studentId, surveyCode) {
                 body: JSON.stringify({
                     student_id: studentId,
                     overall_rating: parseInt(rating),
-                    overall_comments: comments,
-                    future_ideas: futureIdeas
+                    overall_liked: liked,
+                    overall_better: better
                 })
             });
         } else {
@@ -888,14 +789,4 @@ async function submitIndividualSurvey(studentId, surveyCode) {
         console.error('Error submitting survey:', error);
         showError('Failed to submit feedback. Please try again.');
     }
-}
-
-function showSuccess(message) {
-    // Simple success notification
-    alert('✅ ' + message);
-}
-
-function showError(message) {
-    // Simple error notification
-    alert('❌ ' + message);
 }

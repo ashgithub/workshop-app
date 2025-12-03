@@ -103,20 +103,23 @@ async def submit_workshop_feedback(feedback_data: WorkshopFeedbackCreate):
         if not student_check:
             raise HTTPException(status_code=404, detail="Student not found")
 
-        # Insert workshop feedback
-        insert_query = """
-        INSERT INTO WORKSHOP_FEEDBACK (
-            STUDENT_ID, OVERALL_RATING, OVERALL_COMMENTS, FUTURE_IDEAS
-        ) VALUES (
-            :student_id, :overall_rating, :overall_comments, :future_ideas
-        )
+        # UPSERT workshop feedback (update if exists, insert if not)
+        merge_query = """
+        MERGE INTO WORKSHOP_FEEDBACK t
+        USING (SELECT :student_id as STUDENT_ID FROM DUAL) s
+        ON (t.STUDENT_ID = s.STUDENT_ID)
+        WHEN MATCHED THEN
+            UPDATE SET t.OVERALL_RATING = :overall_rating, t.OVERALL_LIKED = :overall_liked, t.OVERALL_BETTER = :overall_better
+        WHEN NOT MATCHED THEN
+            INSERT (STUDENT_ID, OVERALL_RATING, OVERALL_LIKED, OVERALL_BETTER)
+            VALUES (:student_id, :overall_rating, :overall_liked, :overall_better)
         """
 
-        db.execute_dml(insert_query, {
+        db.execute_dml(merge_query, {
             "student_id": feedback_data.student_id,
             "overall_rating": feedback_data.overall_rating,
-            "overall_comments": feedback_data.overall_comments,
-            "future_ideas": feedback_data.future_ideas
+            "overall_liked": feedback_data.overall_liked,
+            "overall_better": feedback_data.overall_better
         })
 
         return {"message": "Workshop feedback submitted successfully"}
