@@ -1,27 +1,20 @@
 # Work TODO
 
 ## Pending Enhancements
-1. **Extend MDC_WORKSHOP Schema**  
-   - Add `INTRO_QUESTIONS` and `ATTENDEE_INTRO_RESPONSES` tables via `backend/database.py` so the new schema mirrors legacy introduction data.
-   - Seed default prompts (Introduce Yourself, Fun Fact, Two Truths & a Lie) and sample responses for test1–test3.
+1. **Admin Dashboard Restoration & Expansion**
+   - Restore editing for intro/onboarding/survey questions (CRUD UI in admin.js/html, tied to backend routers/services).
+   - Add game play UI for 2 Truths & a Lie (reveal lies, manage responses; reference legacy commits like 42694ba).
+   - Implement bulk attendee operations and CSV export.
 
-2. **Admin Intro Management API/UI**  
-   - Service layer methods to list/create/update intro questions.
-   - Admin router endpoints (CRUD, ordering, activation).
-   - Frontend admin tab for managing intro prompts (Redwood styling).
+2. **Onboarding Checklist & Surveys Seeding/Fixing**
+   - Seed default onboarding questions in backend/tasks.py (e.g., "Install VS Code", "Read guidelines") via database inserts or script.
+   - Create and seed surveys as templates: Onboarding Survey (pre-workshop), Daily Modules (one per day, e.g., "Day 1 Feedback"), Overall Survey (post-workshop) in backend/surveys.py; use DAY field or CONFIG for structure (adapt old module-based templates).
+   - Fix rendering/formatting UX in tasks/surveys tabs (apply larger boxes/CSS consistency from intros tab; ensure surveys show by type/module in attendee surveys tab).
 
-3. **Attendee Redwood Experience**  
-   - Restore introduction panel, horizontal progress bar, and refined checklist in `frontend/attendee.html` with matching CSS. ✅
-   - Update `frontend/js/attendee.js` to render intro responses, new progress visuals, and optional cohort time ranges. ✅
-
-4. **Cohort Schedule Metadata**  
-   - Ensure `COHORTS` includes `START_TIME` / `END_TIME` columns via migrations (`backend/database.py`, `scripts/migrate.sh`).
-   - Confirm `backend/services/attendees.py` serializes the new fields so the attendee UI renders the full date+time range.
-
-5. **Testing & Docs**  
-   - Verify migrations via `uv run scripts/migrate.sh` once dependencies load.
-   - Update tests/docs if needed after schema+UI changes. ✅
+3. **Full Testing & Polish**
+   - Test admin editing/game on seeded data (including onboarding/overall/daily surveys); verify mobile responsiveness.
+   - Update docs/architecture.md with new features (survey types: onboarding, daily, overall); run full migrations/tests.
+   - Audit backend APIs for question editing support (e.g., /api/intros/admin, /api/tasks/templates, /api/surveys/modules).
 
 ## Blockers / Notes
-- Python dependencies (`envyaml`, `oracledb`) only load reliably when commands run inside the project venv with `uv run` (see docs/architecture.md).
-- Awaiting environment fix so `uv run python -c "import backend.database"` succeeds before modifying schema.
+- Use git history for old survey module logic if needed (e.g., template CONFIG for types/days).

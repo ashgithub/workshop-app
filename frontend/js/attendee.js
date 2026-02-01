@@ -108,6 +108,7 @@ async function loadAttendee(attendeeId) {
         const attendee = await response.json();
         renderProfile(attendee);
         renderProgress(attendee.progress || {});
+        renderIntroductions(attendee.intros || [], attendee.progress || {}, attendee.acknowledged || false);
         await loadTasks(attendeeId);
         await loadSurveys(attendeeId);
     } catch (error) {
@@ -120,6 +121,7 @@ function renderProfile(attendee) {
     const nameEl = document.getElementById('attendee-name');
     const emailEl = document.getElementById('attendee-email');
     const locationEl = document.getElementById('location-details');
+    const avatarEl = document.getElementById('profile-img');
 
     nameEl.textContent = attendee.full_name || 'AI Workshop Companion';
     emailEl.textContent = attendee.email;
@@ -138,6 +140,15 @@ function renderProfile(attendee) {
         locationEl.innerHTML = locationLines.length
             ? `<div class="cohort-meta">${locationLines.map(line => `<p>${line}</p>`).join('')}</div>`
             : '';
+    }
+
+    if (avatarEl) {
+        const imagePath = attendee.profile_image;
+        if (imagePath) {
+            avatarEl.src = imagePath;
+        } else {
+            avatarEl.src = 'static/images/default-avatar.svg';
+        }
     }
 
     const viewAgendaBtn = document.getElementById('view-agenda-btn');
@@ -216,7 +227,7 @@ function renderProgress(progress) {
         {
             key: 'ack',
             label: 'Workshop acknowledgment',
-            summary: progress.ack_completed ? '✓ Completed' : 'Awaiting response',
+            summary: `${progress.ack_completed ? 1 : 0} / ${progress.ack_total || 1}`,
             total: progress.ack_total || 1,
             completed: progress.ack_completed ? 1 : 0,
         },
@@ -398,48 +409,275 @@ function showError(text) {
     showMessage(text, 'error');
 }
 
-function renderIntroductions(intros, progress) {
+const introRenderers = {
+    text: (intro, value = '') =>
+        `<input type="text" data-question="${intro.question_id}" value="${value}" placeholder="${intro.prompt}">`,
+    textarea: (intro, value = '') =>
+        `<textarea data-question="${intro.question_id}" placeholder="Write your response...">${value}</textarea>`,
+    choice: (intro, value = '') => {
+        const options = intro.config?.options || [];
+        return `
+            <div class="choice-group" role="radiogroup" aria-label="${intro.prompt}">
+                ${options
+                    .map(option => {
+                        const checked = option.value === value ? 'checked' : '';
+                        return `
+                            <label class="choice-option">
+                                <input type="radio" name="intro-choice-${intro.question_id}" value="${option.value}" data-question="${intro.question_id}" ${checked}>
+                                <span>${option.label}</span>
+                            </label>
+                        `;
+                    })
+                    .join('')}
+            </div>
+        `;
+    },
+};
+
+function getRenderer(intro) {
+    const type = intro.question_type || 'text';
+    return introRenderers[type] || introRenderers.text;
+}
+
+function getInputValue(intro, container) {
+    const type = intro.question_type || 'text';
+    if (type === 'choice') {
+        const checked = container.querySelector(`input[data-question="${intro.question_id}"]:checked`);
+        return checked?.value || '';
+    }
+    const field = container.querySelector(`[data-question="${intro.question_id}"]`);
+    return field?.value || '';
+}
+
+function renderIntroFields(intros, truthAnswered) {
+    let fieldsHtml = '';
+    const truthIntros = intros.filter(i => i.code && i.code.startsWith('truth_'));
+    const allTruthsCompleted = truthAnswered === truthIntros.length;
+
+    let questionNum = 1;
+
+    // Team Name
+    const team = intros.find(i => i.code === 'team_name');
+    if (team) {
+        const completed = team.response && team.response.trim().length > 0;
+        const renderer = getRenderer(team);
+        const statusClass = completed ? 'complete' : 'pending';
+        fieldsHtml += `
+            <div class="field-group ${completed ? 'completed' : ''}" data-question-group="${team.question_id}">
+                <div class="field-header">
+                    <div class="field-title">${questionNum++}. ${team.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${completed ? '✓' : '○'}</span>
+                        ${completed ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    ${renderer(team, team.response || '')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Intro
+    const introField = intros.find(i => i.code === 'intro');
+    if (introField) {
+        const completed = introField.response && introField.response.trim().length > 0;
+        const renderer = getRenderer(introField);
+        const statusClass = completed ? 'complete' : 'pending';
+        fieldsHtml += `
+            <div class="field-group ${completed ? 'completed' : ''}" data-question-group="${introField.question_id}">
+                <div class="field-header">
+                    <div class="field-title">${questionNum++}. ${introField.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${completed ? '✓' : '○'}</span>
+                        ${completed ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    ${renderer(introField, introField.response || '')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 2 Truths and a Lie Group
+    if (truthIntros.length > 0) {
+        const parentStatusClass = allTruthsCompleted ? 'complete' : 'pending';
+        fieldsHtml += `
+            <div class="field-group ${allTruthsCompleted ? 'completed' : ''}" data-truth-group="true">
+                <div class="field-header">
+                    <div class="field-title">${questionNum++}. 2 Truths and a Lie</div>
+                    <div class="field-status ${parentStatusClass}">
+                        <span class="status-icon">${allTruthsCompleted ? '✓' : '○'}</span>
+                        ${truthAnswered} / ${truthIntros.length}
+                    </div>
+                </div>
+        `;
+        const roman = ['i', 'ii', 'iii'];
+        truthIntros.forEach((truth, index) => {
+            const completed = truth.response && truth.response.trim().length > 0;
+            const renderer = getRenderer(truth);
+            const statusClass = completed ? 'complete' : 'pending';
+            fieldsHtml += `
+                <div class="sub-field ${completed ? 'completed' : ''}" data-question-group="${truth.question_id}">
+                    <div class="field-header">
+                        <div class="field-title">${roman[index]}. ${truth.prompt}</div>
+                        <div class="field-status ${statusClass}">
+                            <span class="status-icon">${completed ? '✓' : '○'}</span>
+                            ${completed ? 'Complete' : 'Pending'}
+                        </div>
+                    </div>
+                    <div class="intro-input">
+                        ${renderer(truth, truth.response || '')}
+                    </div>
+                </div>
+            `;
+        });
+        fieldsHtml += `</div>`;
+    }
+
+    // Device Preference
+    const device = intros.find(i => i.code === 'device_pref');
+    if (device) {
+        const completed = device.response && device.response.trim().length > 0;
+        const renderer = getRenderer(device);
+        const statusClass = completed ? 'complete' : 'pending';
+        fieldsHtml += `
+            <div class="field-group ${completed ? 'completed' : ''}" data-question-group="${device.question_id}">
+                <div class="field-header">
+                    <div class="field-title">${questionNum++}. ${device.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${completed ? '✓' : '○'}</span>
+                        ${completed ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    ${renderer(device, device.response || '')}
+                </div>
+            </div>
+        `;
+    }
+
+    // T-Shirt Size
+    const tshirt = intros.find(i => i.code === 'tshirt_size');
+    if (tshirt) {
+        const completed = tshirt.response && tshirt.response.trim().length > 0;
+        const renderer = getRenderer(tshirt);
+        const statusClass = completed ? 'complete' : 'pending';
+        fieldsHtml += `
+            <div class="field-group ${completed ? 'completed' : ''}" data-question-group="${tshirt.question_id}">
+                <div class="field-header">
+                    <div class="field-title">${questionNum++}. ${tshirt.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${completed ? '✓' : '○'}</span>
+                        ${completed ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    ${renderer(tshirt, tshirt.response || '')}
+                </div>
+            </div>
+        `;
+    }
+
+    fieldsHtml += `<button class="btn-primary save-all-btn" id="save-all-intros">Save All Changes</button>`;
+
+    return fieldsHtml;
+}
+
+function renderIntroductions(intros, progress, acknowledged) {
     const list = document.getElementById('intro-list');
     const pill = document.getElementById('intro-progress-pill');
     const fill = document.getElementById('intro-progress-fill');
     if (!list || !pill || !fill) return;
 
     const total = progress.intro_total || intros.length;
-    const answered = progress.intro_completed || intros.filter(item => item.response && item.response.trim()).length;
+    const answered = progress.intro_completed || 0;
     pill.textContent = `${answered} of ${total} answered`;
     const percent = total ? Math.round((answered / total) * 100) : 0;
     fill.style.width = `${percent}%`;
 
-    if (!intros.length) {
-        list.innerHTML = '<p>Introductions will appear here once available.</p>';
-        return;
+    const truthIntros = intros.filter(i => i.code && i.code.startsWith('truth_'));
+    const truthAnswered = truthIntros.filter(i => i.response && i.response.trim()).length;
+
+    let html = '';
+    // Acknowledgement Section
+    const ackCompleted = acknowledged ? 1 : 0;
+    html += `
+        <section class="intro-section" data-section="ack">
+            <header class="section-header">
+                <h3>Acknowledgement</h3>
+                <div class="section-progress" data-progress="ack">${ackCompleted} / 1</div>
+            </header>
+            <div class="field-group ${acknowledged ? 'completed' : ''}">
+                <div class="field-header">
+                    <div class="field-title">Workshop guidelines acknowledgement</div>
+                    <div class="field-status ${acknowledged ? 'complete' : 'pending'}">
+                        <span class="status-icon">${acknowledged ? '✓' : '○'}</span>
+                        ${acknowledged ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="ack-checkbox" ${acknowledged ? 'checked disabled' : ''}>
+                        <span>I acknowledge that I have read and agree to the workshop guidelines and code of conduct.</span>
+                    </label>
+                    ${acknowledged ? '' : '<button class="btn-secondary ack-btn" id="ack-save">Submit acknowledgement</button>'}
+                </div>
+            </div>
+        </section>
+    `;
+
+    // Introduction Section
+    html += `
+        <section class="intro-section" data-section="intro">
+            <header class="section-header">
+                <h3>Introduction</h3>
+                <div class="section-progress" data-progress="intro">${answered} / ${total}</div>
+            </header>
+            ${!intros.length ? '<p>Introductions will appear here once available.</p>' : renderIntroFields(intros, truthAnswered)}
+        </section>
+    `;
+
+    list.innerHTML = html;
+
+    const ackSaveBtn = document.getElementById('ack-save');
+    if (ackSaveBtn) {
+        ackSaveBtn.addEventListener('click', async () => {
+            const checkbox = document.getElementById('ack-checkbox');
+            if (!checkbox.checked) {
+                showMessage('Please check the acknowledgement box first.', 'error');
+                return;
+            }
+            const attendeeId = getAttendeeId();
+            if (!attendeeId) return;
+            try {
+                const ackResponse = await apiFetch(`/api/attendees/${attendeeId}/ack`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ acknowledged: true }),
+                });
+                if (!ackResponse.ok) {
+                    throw new Error(await ackResponse.text());
+                }
+                showSuccess('Acknowledgement saved');
+                loadAttendee(attendeeId);
+            } catch (error) {
+                console.error('Failed to save acknowledgement', error);
+                showMessage('Unable to save acknowledgement. Please retry.', 'error');
+            }
+        });
     }
 
-    list.innerHTML = intros
-        .map(intro => {
-            const completed = intro.response && intro.response.trim().length > 0;
-            const updated = intro.updated_at ? new Date(intro.updated_at).toLocaleString() : 'Not yet shared';
-            return `
-                <article class="intro-card ${completed ? 'completed' : ''}">
-                    <header>
-                        <h3>${intro.prompt}</h3>
-                        <span class="badge ${completed ? 'complete' : 'pending'}">${completed ? 'Shared' : 'Pending'}</span>
-                    </header>
-                    <textarea data-question="${intro.question_id}" placeholder="Write your response...">${intro.response || ''}</textarea>
-                    <footer>
-                        <span>Updated: ${updated}</span>
-                        <button class="btn-secondary" data-save="${intro.question_id}">Save</button>
-                    </footer>
-                </article>
-            `;
-        })
-        .join('');
-
-    list.querySelectorAll('[data-save]').forEach(button => {
-        button.addEventListener('click', async event => {
-            const questionId = Number(event.currentTarget.getAttribute('data-save'));
-            const textarea = list.querySelector(`textarea[data-question="${questionId}"]`);
-            const response = textarea?.value || '';
+    // Individual Save Listeners
+    list.querySelectorAll('[data-question]').forEach(input => {
+        input.addEventListener('blur', async (event) => {
+            const questionId = Number(event.target.dataset.question);
+            const intro = intros.find(item => item.question_id === questionId);
+            if (!intro) return;
+            const container = event.target.closest('.field-group') || event.target.closest('.sub-field');
+            const response = getInputValue(intro, container);
+            if (response.trim() === (intro.response || '').trim()) return;
             const attendeeId = getAttendeeId();
             if (!attendeeId) return;
             try {
@@ -451,12 +689,46 @@ function renderIntroductions(intros, progress) {
                 if (!saveResponse.ok) {
                     throw new Error(await saveResponse.text());
                 }
-                showSuccess('Introduction saved');
+                showSuccess('Saved');
                 loadAttendee(attendeeId);
             } catch (error) {
-                console.error('Failed to save intro response', error);
-                showMessage('Unable to save introduction. Please retry.', 'error');
+                console.error('Failed to save', error);
+                showMessage('Save failed. Please retry.', 'error');
             }
         });
     });
+
+    // Save All Button
+    const saveAllBtn = document.getElementById('save-all-intros');
+    if (saveAllBtn) {
+        saveAllBtn.addEventListener('click', async () => {
+            const attendeeId = getAttendeeId();
+            if (!attendeeId) return;
+            let saveCount = 0;
+            for (const intro of intros) {
+                const container = list.querySelector(`[data-question="${intro.question_id}"]`)
+                    ?.closest('.field-group, .sub-field');
+                const response = container ? getInputValue(intro, container) : '';
+                if (response.trim() === (intro.response || '').trim()) continue;
+                try {
+                    const saveResponse = await apiFetch(`/api/intros/attendees/${attendeeId}/${intro.question_id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ response }),
+                    });
+                    if (saveResponse.ok) {
+                        saveCount++;
+                    }
+                } catch (error) {
+                    console.error('Save failed for', intro.code, error);
+                }
+            }
+            if (saveCount > 0) {
+                showSuccess(`${saveCount} changes saved`);
+                loadAttendee(attendeeId);
+            } else {
+                showMessage('No changes to save.', 'info');
+            }
+        });
+    }
 }

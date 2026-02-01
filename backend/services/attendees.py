@@ -10,7 +10,7 @@ from backend.services import intros as intro_service
 def get_attendee(attendee_id: int) -> Optional[dict]:
     row = db.fetch_one(
         """
-        SELECT a.ID, a.EMAIL, a.FULL_NAME,
+        SELECT a.ID, a.EMAIL, a.FULL_NAME, a.PROFILE_IMAGE, a.ACKNOWLEDGED,
                c.ID, c.TITLE, c.LOCATION_NAME, c.ADDRESS, c.ROOM, c.START_DATE, c.END_DATE,
                c.START_TIME, c.END_TIME
         FROM ATTENDEES a
@@ -26,16 +26,18 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
         "attendee_id": row[0],
         "email": row[1],
         "full_name": row[2],
+        "profile_image": row[3],
+        "acknowledged": row[4] == 'Y',
         "cohort": {
-            "id": row[3],
-            "title": row[4],
-            "location_name": row[5],
-            "address": row[6],
-            "room": row[7],
-            "start_date": row[8].isoformat() if row[8] else None,
-            "end_date": row[9].isoformat() if row[9] else None,
-            "start_time": row[10].isoformat() if row[10] else None,
-            "end_time": row[11].isoformat() if row[11] else None,
+            "id": row[5],
+            "title": row[6],
+            "location_name": row[7],
+            "address": row[8],
+            "room": row[9],
+            "start_date": row[10].isoformat() if row[10] else None,
+            "end_date": row[11].isoformat() if row[11] else None,
+            "start_time": row[12].isoformat() if row[12] else None,
+            "end_time": row[13].isoformat() if row[13] else None,
         },
     }
 
@@ -80,6 +82,12 @@ def get_progress(attendee_id: int) -> dict:
         {"attendee_id": attendee_id},
     ) or (0, 0)
 
+    ack_row = db.fetch_one(
+        "SELECT ACKNOWLEDGED FROM ATTENDEES WHERE ID = :attendee_id",
+        {"attendee_id": attendee_id},
+    )
+    ack_completed = bool(ack_row and ack_row[0] == 'Y')
+
     completed_tasks = tasks[1]
     total_tasks = tasks[0]
     total_surveys_completed = submissions[0]
@@ -89,7 +97,6 @@ def get_progress(attendee_id: int) -> dict:
     intro_total = intro[0]
     intro_completed = intro[1]
     ack_total = 1
-    ack_completed = False
 
     progress_components = []
     if ack_total:
@@ -122,3 +129,16 @@ def get_progress(attendee_id: int) -> dict:
 
 def get_intro_responses(attendee_id: int) -> list[dict]:
     return intro_service.list_attendee_responses(attendee_id)
+
+
+def update_attendee_ack(attendee_id: int, acknowledged: bool) -> bool:
+    val = 'Y' if acknowledged else 'N'
+    rowcount = db.execute_dml(
+        """
+        UPDATE ATTENDEES
+        SET ACKNOWLEDGED = :val, UPDATED_AT = CURRENT_TIMESTAMP
+        WHERE ID = :attendee_id
+        """,
+        {"val": val, "attendee_id": attendee_id},
+    )
+    return rowcount > 0

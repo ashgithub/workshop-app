@@ -1,6 +1,7 @@
 """Introduction management service for MDC_WORKSHOP schema."""
 from __future__ import annotations
 
+import json
 from typing import Dict, Iterable, List, Optional
 
 from backend.database import db
@@ -19,16 +20,32 @@ def _normalize_lob(value):
     return value
 
 
+def _parse_config(value):
+    parsed = _normalize_lob(value)
+    if not parsed:
+        return None
+    if isinstance(parsed, dict):
+        return parsed
+    if isinstance(parsed, (bytes, bytearray)):
+        parsed = parsed.decode("utf-8", errors="ignore")
+    if isinstance(parsed, str):
+        try:
+            return json.loads(parsed)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return None
+
+
 def list_questions(include_inactive: bool = False) -> List[dict]:
     filters = "" if include_inactive else "WHERE ACTIVE = 'Y'"
     rows = db.execute_query(
         f"""
-        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE
+        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG
         FROM INTRO_QUESTIONS
         {filters}
         ORDER BY DISPLAY_ORDER, ID
         """
-    )
+    ) or []
 
     return [
         {
@@ -38,6 +55,8 @@ def list_questions(include_inactive: bool = False) -> List[dict]:
             "display_order": row[3],
             "required": row[4] == 'Y',
             "active": row[5] == 'Y',
+            "question_type": row[6],
+            "config": _parse_config(row[7]),
         }
         for row in rows
     ]
@@ -46,7 +65,7 @@ def list_questions(include_inactive: bool = False) -> List[dict]:
 def get_question(question_id: int) -> Optional[dict]:
     row = db.fetch_one(
         """
-        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE
+        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG
         FROM INTRO_QUESTIONS
         WHERE ID = :question_id
         """,
@@ -63,13 +82,15 @@ def get_question(question_id: int) -> Optional[dict]:
         "display_order": row[3],
         "required": row[4] == 'Y',
         "active": row[5] == 'Y',
+        "question_type": row[6],
+        "config": _parse_config(row[7]),
     }
 
 
 def create_question(payload: dict) -> int:
     query = """
-        INSERT INTO INTRO_QUESTIONS (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE)
-        VALUES (:code, :prompt, :display_order, :required, :active)
+        INSERT INTO INTRO_QUESTIONS (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG)
+        VALUES (:code, :prompt, :display_order, :required, :active, :question_type, :config)
         RETURNING ID INTO :out_id
     """
     params = {
@@ -78,6 +99,8 @@ def create_question(payload: dict) -> int:
         "display_order": payload.get("display_order", 0),
         "required": 'Y' if payload.get("required", True) else 'N',
         "active": 'Y' if payload.get("active", True) else 'N',
+        "question_type": payload.get("question_type", "text"),
+        "config": json.dumps(payload.get("config")) if payload.get("config") is not None else None,
     }
     return db.execute_returning(query, params)
 
@@ -101,6 +124,12 @@ def update_question(question_id: int, payload: dict) -> None:
     if "active" in payload:
         fields.append("ACTIVE = :active")
         params["active"] = 'Y' if payload["active"] else 'N'
+    if "question_type" in payload:
+        fields.append("QUESTION_TYPE = :question_type")
+        params["question_type"] = payload["question_type"]
+    if "config" in payload:
+        fields.append("CONFIG = :config")
+        params["config"] = json.dumps(payload["config"]) if payload["config"] is not None else None
 
     if not fields:
         return
@@ -131,7 +160,7 @@ def reorder_questions(order_map: Iterable[dict]) -> None:
 def list_attendee_responses(attendee_id: int) -> List[dict]:
     rows = db.execute_query(
         """
-        SELECT q.ID, q.PROMPT, q.CODE, q.DISPLAY_ORDER, q.REQUIRED,
+        SELECT q.ID, q.PROMPT, q.CODE, q.DISPLAY_ORDER, q.REQUIRED, q.QUESTION_TYPE, q.CONFIG,
                r.ID, r.RESPONSE, r.UPDATED_AT
         FROM INTRO_QUESTIONS q
         LEFT JOIN ATTENDEE_INTRO_RESPONSES r
@@ -140,7 +169,7 @@ def list_attendee_responses(attendee_id: int) -> List[dict]:
         ORDER BY q.DISPLAY_ORDER, q.ID
         """,
         {"attendee_id": attendee_id},
-    )
+    ) or []
 
     responses = []
     for row in rows:
@@ -151,9 +180,11 @@ def list_attendee_responses(attendee_id: int) -> List[dict]:
                 "code": row[2],
                 "display_order": row[3],
                 "required": row[4] == 'Y',
-                "response_id": row[5],
-                "response": _normalize_lob(row[6]),
-                "updated_at": row[7].isoformat() if row[7] else None,
+                "question_type": row[5],
+                "config": _parse_config(row[6]),
+                "response_id": row[7],
+                "response": _normalize_lob(row[8]),
+                "updated_at": row[9].isoformat() if row[9] else None,
             }
         )
     return responses

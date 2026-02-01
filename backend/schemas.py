@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -95,14 +95,18 @@ class IntroQuestionBase(BaseModel):
     display_order: Optional[int] = None
     required: Optional[bool] = None
     active: Optional[bool] = None
+    question_type: Optional[str] = None
+    config: Optional[dict] = None
 
 
 class IntroQuestionCreate(IntroQuestionBase):
     code: str
-    prompt: str
+    prompt: str = Field(...)
     display_order: int = 0
     required: bool = True
     active: bool = True
+    question_type: str = "text"
+    config: Optional[dict] = None
 
 
 class IntroQuestionUpdate(IntroQuestionBase):
@@ -119,7 +123,7 @@ class IntroReorderRequest(BaseModel):
 
 
 class IntroResponseUpdate(BaseModel):
-    response: Optional[str] = None
+    response: Optional[Any] = None
 
 
 # ---------------------------------------------------------------------------

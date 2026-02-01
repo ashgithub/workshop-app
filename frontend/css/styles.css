@@ -464,62 +464,7 @@ textarea:focus {
 
 .progress-pill {
     font-weight: 600;
-    color: #1e293b;
-    padding: 6px 14px;
-    border-radius: 999px;
-    background: #e0f2fe;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-}
 
-.intro-list {
-    display: grid;
-    gap: 16px;
-}
-
-.intro-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 16px;
-    background: #ffffff;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.intro-card.completed {
-    border-color: rgba(59, 130, 246, 0.4);
-    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.15);
-}
-
-.intro-card header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-}
-
-.intro-card h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #1f2937;
-}
-
-.intro-card textarea {
-    width: 100%;
-    border-radius: 12px;
-    border: 1px solid #d1d5db;
-    padding: 12px;
-    min-height: 80px;
-    font-size: 0.95rem;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.intro-card textarea:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-}
-
-.intro-card footer {
     margin-top: 12px;
     display: flex;
     justify-content: space-between;
@@ -1389,6 +1334,206 @@ h3.completed {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+.intro-section {
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 24px;
+    padding: 32px 36px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    display: grid;
+    gap: 28px;
+}
+
+.intro-section + .intro-section {
+    margin-top: 12px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+    padding-bottom: 12px;
+}
+
+.section-header h3 {
+    font-size: 1.3rem;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.section-progress {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    background: #e0f2fe;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(59, 130, 246, 0.45);
+}
+
+.field-group {
+    background: rgba(248, 250, 252, 0.85);
+    border: 1px solid rgba(203, 213, 225, 0.6);
+    border-radius: 18px;
+    padding: 24px 28px;
+    display: grid;
+    gap: 18px;
+    position: relative;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field-group.completed {
+    border-color: rgba(34, 197, 94, 0.55);
+    box-shadow: 0 12px 28px rgba(34, 197, 94, 0.18);
+    background: rgba(236, 253, 245, 0.9);
+}
+
+.field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.field-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.field-status {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.field-status.complete {
+    color: #16a34a;
+}
+
+.field-status.pending {
+    color: #f97316;
+}
+
+.intro-input {
+    display: grid;
+    gap: 12px;
+}
+
+.intro-input input[type="text"],
+.intro-input textarea {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.7);
+    padding: 16px 20px;
+    font-size: 1.1rem;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.intro-input textarea {
+    min-height: 160px;
+    resize: vertical;
+}
+
+.intro-input input[type="text"]:focus,
+.intro-input textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+.choice-group {
+    display: grid;
+    gap: 10px;
+}
+
+.choice-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(203, 213, 225, 0.7);
+}
+
+.choice-option input[type="radio"] {
+    transform: scale(1.15);
+}
+
+.checkmark {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.sub-field {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 14px;
+    border: 1px dashed rgba(148, 163, 184, 0.6);
+    padding: 18px 22px;
+}
+
+.sub-field + .sub-field {
+    margin-top: 10px;
+}
+
+.sub-field.completed {
+    border-color: rgba(34, 197, 94, 0.55);
+    background: rgba(236, 253, 245, 0.85);
+}
+
+.sub-progress {
+    font-size: 0.9rem;
+    color: #475569;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.12);
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+.completed-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: #15803d;
+    background: rgba(236, 253, 245, 0.95);
+    border: 1px solid rgba(134, 239, 172, 0.6);
+    padding: 12px 16px;
+    border-radius: 16px;
+}
+
+.ack-btn {
+    margin-top: 12px;
+    max-width: fit-content;
+}
+
+.save-all-btn {
+    justify-self: end;
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 999px;
+}
+
+@media (max-width: 768px) {
+    .intro-section {
+        padding: 20px;
+    }
+
+    .field-group {
+        padding: 16px;
+    }
+
+    .section-header h3 {
+        font-size: 1.1rem;
+    }
 }
 
 

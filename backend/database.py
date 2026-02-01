@@ -112,13 +112,14 @@ class DatabaseConnection:
             "DROP TABLE COHORTS CASCADE CONSTRAINTS",
             "DROP TABLE INTRO_QUESTIONS CASCADE CONSTRAINTS",
             "DROP TABLE ATTENDEE_INTRO_RESPONSES CASCADE CONSTRAINTS",
-            "DROP TABLE SURVEY_RESPONSES CASCADE CONSTRAINTS",
-            "DROP TABLE WORKSHOP_FEEDBACK CASCADE CONSTRAINTS",
-            "DROP TABLE ONBOARDING_TASKS CASCADE CONSTRAINTS",
-            "DROP TABLE ONBOARDING_TASKS_BACKUP CASCADE CONSTRAINTS",
-            "DROP TABLE STUDENTS CASCADE CONSTRAINTS",
-            "DROP TABLE STUDENTS_BACKUP CASCADE CONSTRAINTS",
-            "DROP TABLE LOCATIONS CASCADE CONSTRAINTS",
+            # Legacy tables below no longer exist in the MDC schema but are kept for restore scripts
+            # "DROP TABLE SURVEY_RESPONSES CASCADE CONSTRAINTS",
+            # "DROP TABLE WORKSHOP_FEEDBACK CASCADE CONSTRAINTS",
+            # "DROP TABLE ONBOARDING_TASKS CASCADE CONSTRAINTS",
+            # "DROP TABLE ONBOARDING_TASKS_BACKUP CASCADE CONSTRAINTS",
+            # "DROP TABLE STUDENTS CASCADE CONSTRAINTS",
+            # "DROP TABLE STUDENTS_BACKUP CASCADE CONSTRAINTS",
+            # "DROP TABLE LOCATIONS CASCADE CONSTRAINTS",
         ]
 
         for stmt in drop_statements:
@@ -162,7 +163,9 @@ class DatabaseConnection:
                 COHORT_ID NUMBER NOT NULL REFERENCES COHORTS(ID) ON DELETE CASCADE,
                 EMAIL VARCHAR2(255) NOT NULL,
                 FULL_NAME VARCHAR2(255),
+                PROFILE_IMAGE VARCHAR2(500),
                 IS_TEST CHAR(1) DEFAULT 'N' CHECK (IS_TEST IN ('Y','N')),
+                ACKNOWLEDGED CHAR(1) DEFAULT 'N' CHECK (ACKNOWLEDGED IN ('Y','N')),
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (COHORT_ID, EMAIL)
@@ -208,6 +211,8 @@ class DatabaseConnection:
                 DISPLAY_ORDER NUMBER DEFAULT 0,
                 REQUIRED CHAR(1) DEFAULT 'Y' CHECK (REQUIRED IN ('Y','N')),
                 ACTIVE CHAR(1) DEFAULT 'Y' CHECK (ACTIVE IN ('Y','N')),
+                QUESTION_TYPE VARCHAR2(30) DEFAULT 'text' NOT NULL,
+                CONFIG CLOB,
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -452,9 +457,21 @@ class DatabaseConnection:
 
         if cohort_id and template_rows:
             test_attendees = [
-                {"email": "test1@test.org", "full_name": "Jordan Rivera"},
-                {"email": "test2@test.org", "full_name": "Casey Morgan"},
-                {"email": "test3@test.org", "full_name": "Taylor Quinn"},
+                {
+                    "email": "test1@test.org",
+                    "full_name": "Jordan Rivera",
+                    "profile_image": "static/images/cropped_images/face_test1_at_test_org.png",
+                },
+                {
+                    "email": "test2@test.org",
+                    "full_name": "Casey Morgan",
+                    "profile_image": "static/images/cropped_images/face_test2_at_test_org.png",
+                },
+                {
+                    "email": "test3@test.org",
+                    "full_name": "Taylor Quinn",
+                    "profile_image": "static/images/cropped_images/face_test3_at_test_org.png",
+                },
             ]
 
             for attendee in test_attendees:
@@ -466,20 +483,25 @@ class DatabaseConnection:
                 if attendee_row:
                     attendee_id = attendee_row[0]
                     self.execute_dml(
-                        "UPDATE ATTENDEES SET FULL_NAME = :full_name, IS_TEST = 'Y' WHERE ID = :attendee_id",
-                        {"full_name": attendee["full_name"], "attendee_id": attendee_id},
+                        "UPDATE ATTENDEES SET FULL_NAME = :full_name, PROFILE_IMAGE = :profile_image, IS_TEST = 'Y' WHERE ID = :attendee_id",
+                        {
+                            "full_name": attendee["full_name"],
+                            "profile_image": attendee.get("profile_image"),
+                            "attendee_id": attendee_id,
+                        },
                     )
                 else:
                     attendee_id = self.execute_returning(
                         """
-                        INSERT INTO ATTENDEES (COHORT_ID, EMAIL, FULL_NAME, IS_TEST)
-                        VALUES (:cohort_id, :email, :full_name, 'Y')
+                        INSERT INTO ATTENDEES (COHORT_ID, EMAIL, FULL_NAME, PROFILE_IMAGE, IS_TEST)
+                        VALUES (:cohort_id, :email, :full_name, :profile_image, 'Y')
                         RETURNING ID INTO :out_id
                         """,
                         {
                             "cohort_id": cohort_id,
                             "email": attendee["email"],
                             "full_name": attendee["full_name"],
+                            "profile_image": attendee.get("profile_image"),
                         },
                     )
 
@@ -502,9 +524,10 @@ class DatabaseConnection:
                 submissions_count = self.fetch_one(
                     "SELECT COUNT(*) FROM SURVEY_SUBMISSIONS WHERE ATTENDEE_ID = :attendee_id",
                     {"attendee_id": attendee_id},
-                ) or (0,)
+                )
+                count = submissions_count[0] if submissions_count else 0
 
-                if survey_id and submissions_count[0] == 0:
+                if survey_id and count == 0:
                     self.execute_dml(
                         """
                         INSERT INTO SURVEY_SUBMISSIONS (ATTENDEE_ID, TEMPLATE_ID)
@@ -517,9 +540,62 @@ class DatabaseConnection:
                     )
 
         intro_questions = [
-            {"code": "intro", "prompt": "Tell us about yourself.", "order": 1, "required": "Y"},
-            {"code": "fun_fact", "prompt": "Share a fun fact your cohort should know.", "order": 2, "required": "Y"},
-            {"code": "two_truths", "prompt": "Two truths and a lie (let your peers guess!).", "order": 3, "required": "N"},
+            {
+                "code": "team_name",
+                "prompt": "Team name",
+                "order": 1,
+                "required": "Y",
+                "question_type": "text",
+                "config": None,
+            },
+            {
+                "code": "intro",
+                "prompt": "Tell us about yourself.",
+                "order": 2,
+                "required": "Y",
+                "question_type": "textarea",
+                "config": None,
+            },
+            {
+                "code": "truth_1",
+                "prompt": "Two truths and a lie — entry 1",
+                "order": 3,
+                "required": "Y",
+                "question_type": "text",
+                "config": None,
+            },
+            {
+                "code": "truth_2",
+                "prompt": "Two truths and a lie — entry 2",
+                "order": 4,
+                "required": "Y",
+                "question_type": "text",
+                "config": None,
+            },
+            {
+                "code": "truth_3",
+                "prompt": "Two truths and a lie — entry 3",
+                "order": 5,
+                "required": "Y",
+                "question_type": "text",
+                "config": None,
+            },
+            {
+                "code": "device_pref",
+                "prompt": "Which device will you bring?",
+                "order": 6,
+                "required": "Y",
+                "question_type": "choice",
+                "config": '{"options":[{"value":"M","label":"Mac"},{"value":"P","label":"PC"}]}'
+            },
+            {
+                "code": "tshirt_size",
+                "prompt": "Preferred T-shirt size",
+                "order": 7,
+                "required": "Y",
+                "question_type": "choice",
+                "config": '{"options":[{"value":"S","label":"Small"},{"value":"M","label":"Medium"},{"value":"L","label":"Large"},{"value":"XL","label":"Extra Large"}]}'
+            },
         ]
 
         for question in intro_questions:
@@ -529,12 +605,14 @@ class DatabaseConnection:
                 USING (SELECT :code AS CODE FROM DUAL) src
                 ON (t.CODE = src.CODE)
                 WHEN NOT MATCHED THEN
-                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED)
-                    VALUES (:code, :prompt, :display_order, :required)
+                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, QUESTION_TYPE, CONFIG)
+                    VALUES (:code, :prompt, :display_order, :required, :question_type, :config)
                 WHEN MATCHED THEN
                     UPDATE SET PROMPT = :prompt,
                                DISPLAY_ORDER = :display_order,
                                REQUIRED = :required,
+                               QUESTION_TYPE = :question_type,
+                               CONFIG = :config,
                                ACTIVE = 'Y',
                                UPDATED_AT = CURRENT_TIMESTAMP
                 """,
@@ -543,29 +621,41 @@ class DatabaseConnection:
                     "prompt": question["prompt"],
                     "display_order": question["order"],
                     "required": question["required"],
+                    "question_type": question["question_type"],
+                    "config": question["config"],
                 },
             )
 
         question_rows = self.execute_query(
             "SELECT CODE, ID FROM INTRO_QUESTIONS WHERE ACTIVE = 'Y'",
-        )
+        ) or []
         question_map = {code: qid for code, qid in question_rows}
 
         intro_seed = {
             "test1@test.org": {
+                "team_name": "Redwood Rockets",
                 "intro": "I lead the Redwood UI workstream and mentor new attendees.",
-                "fun_fact": "Ran a marathon on every continent.",
-                "two_truths": "I speak four languages; I can't ride a bike; I design board games.",
+                "truth_1": "I speak four languages.",
+                "truth_2": "I can't ride a bike.",
+                "truth_3": "I design board games.",
+                "device_pref": "M",
             },
             "test2@test.org": {
+                "team_name": "Travel Titans",
                 "intro": "I coordinate travel logistics and on-site experiences.",
-                "fun_fact": "Collect vintage typewriters.",
-                "two_truths": "I've met three astronauts; I hate coffee; I code during flights.",
+                "truth_1": "I've met three astronauts.",
+                "truth_2": "I hate coffee.",
+                "truth_3": "I code during flights.",
+                "device_pref": "P",
             },
             "test3@test.org": {
+                "team_name": "AI All-Stars",
                 "intro": "I run daily AI lab sessions for MDC cohorts.",
-                "fun_fact": "Once DJ'd a workshop after-party.",
-                "two_truths": "I paint abstract art; I have a twin; I'm terrified of heights.",
+                "truth_1": "I paint abstract art.",
+                "truth_2": "I have a twin.",
+                "truth_3": "I'm terrified of heights.",
+                "device_pref": "M",
+                "tshirt_size": "L",
             },
         }
 
