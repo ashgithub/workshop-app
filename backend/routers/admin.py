@@ -7,7 +7,8 @@ import logging
 import os
 
 from ..database import db
-from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
+# NL_QUERY functionality disabled - unused schema imports commented out
+# from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
 import select_ai
 from ..config import config
 
@@ -226,40 +227,41 @@ async def get_all_attendees(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/query", response_model=AdminQueryResponse)
-async def execute_natural_language_query(query_request: AdminQueryRequest):
-    """
-    Execute natural language query using Oracle SELECT AI.
-    """
-    try:
-        # Get the SELECT AI profile
-        profile = get_select_ai_profile()
+# NL_QUERY functionality disabled - natural language query endpoints commented out
+# @router.post("/query", response_model=AdminQueryResponse)
+# async def execute_natural_language_query(query_request: AdminQueryRequest):
+#     """
+#     Execute natural language query using Oracle SELECT AI.
+#     """
+#     try:
+#         # Get the SELECT AI profile
+#         profile = get_select_ai_profile()
 
-        # Execute the natural language query
-        df = profile.run_sql(prompt=query_request.query)
+#         # Execute the natural language query
+#         df = profile.run_sql(prompt=query_request.query)
 
-        # Convert DataFrame to list of dictionaries
-        results = []
-        if not df.empty:
-            results = df.to_dict('records')
+#         # Convert DataFrame to list of dictionaries
+#         results = []
+#         if not df.empty:
+#             results = df.to_dict('records')
 
-        # Generate a summary based on the results
-        if df.empty:
-            summary = "No results found for the query"
-        else:
-            num_rows = len(df)
-            num_cols = len(df.columns)
-            summary = f"Found {num_rows} result{'s' if num_rows != 1 else ''} with {num_cols} column{'s' if num_cols != 1 else ''}"
+#         # Generate a summary based on the results
+#         if df.empty:
+#             summary = "No results found for the query"
+#         else:
+#             num_rows = len(df)
+#             num_cols = len(df.columns)
+#             summary = f"Found {num_rows} result{'s' if num_rows != 1 else ''} with {num_cols} column{'s' if num_cols != 1 else ''}"
 
-        return AdminQueryResponse(
-            query=query_request.query,
-            results=results,
-            summary=summary
-        )
+#         return AdminQueryResponse(
+#             query=query_request.query,
+#             results=results,
+#             summary=summary
+#         )
 
-    except Exception as e:
-        logger.error(f"Error executing natural language query '{query_request.query}': {e}")
-        raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Error executing natural language query '{query_request.query}': {e}")
+#         raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
 
 
 @router.get("/locations")

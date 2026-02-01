@@ -11,6 +11,7 @@ app:
   debug: $DEBUG:false  # Set to true for development
   secret_key:  $SECRET_KEY:your-secret-key-change-in-production
   reset_schema_on_startup: $RESET_SCHEMA_ON_STARTUP:false
+  reset_data_on_startup: $RESET_DATA_ON_STARTUP:false
 
 proxy:
   enabled: $PROXY_ENABLED:false

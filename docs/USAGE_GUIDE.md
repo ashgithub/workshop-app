@@ -3,7 +3,6 @@
 ## Prerequisites
 - Python 3.11+
 - Access to an Oracle database with credentials and wallet files
-- OpenAI/Select AI credentials if natural-language querying is enabled
 
 ## Installation
 1. Create and activate a virtual environment:
@@ -15,8 +14,8 @@
    ```bash
    pip install -e .
    ```
-3. Copy `.env.example` to `.env` and fill in Oracle and AI keys.
-4. Update `config.yaml` if overriding defaults (proxy, schema reset).
+3. Copy `.env.example` to `.env` and fill in Oracle credentials.
+4. Update `config.yaml` if overriding defaults (proxy, data management modes).
 
 ## Running the Application
 1. Ensure the Oracle DSN is reachable from this host.
@@ -30,12 +29,17 @@
    - `http://localhost:8000/admin.html` for admin dashboard
 
 ## Configuration Notes
-- `RESET_SCHEMA_ON_STARTUP=false` by default to preserve data.
+- Database management modes:
+  - `RESET_SCHEMA_ON_STARTUP=false` (default): Preserve existing data
+  - `RESET_DATA_ON_STARTUP=true`: Truncate and reseed data (fast, keeps schema)
+  - `RESET_SCHEMA_ON_STARTUP=true`: Rebuild entire schema (destructive, use with caution)
 - Use `config.yaml` or environment variables to supply Oracle wallet paths, proxy settings, and admin shared password.
 - Admin dashboard ignores test seed accounts while `IGNORE_TEST_USERS=true`.
 
 ## Maintenance Workflow
-- To refresh seeds manually, run `./scripts/migrate.sh`.
-- To restore legacy AIWorkshopAdmin tables into your legacy schema, run `./scripts/restore_legacy.py` with Oracle credentials set in `config.yaml` or env vars.
-- To temporarily rebuild on app start, export `RESET_SCHEMA_ON_STARTUP=true` and restart once.
-- Monitor `backend/logs` (if configured) for Oracle connection issues.
+- **Normal operation**: Leave all reset flags `false` for production use
+- **Development data reset**: Set `RESET_DATA_ON_STARTUP=true` for quick data cleanup
+- **Schema migration**: Set `RESET_SCHEMA_ON_STARTUP=true` when deploying schema changes
+- To refresh seeds manually, run `./scripts/migrate.sh`
+- To restore legacy AIWorkshopAdmin tables, run `./scripts/restore_legacy.py`
+- Monitor startup logs for detailed table drop/create/seed progress

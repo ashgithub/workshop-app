@@ -3,6 +3,7 @@
 ## Environment Setup
 - Activate the same virtual environment used for development.
 - Ensure Oracle test DSN contains the seeded MDC cohort and three test attendees.
+- Set `RESET_DATA_ON_STARTUP=true` for clean test data on each startup.
 
 ## Smoke Tests
 1. **API Health**
@@ -21,7 +22,6 @@
 - **Cohort Management**: Invite a new attendee via admin UI, confirm tasks generated in Oracle (`ATTENDEE_TASKS`).
 - **Onboarding Tasks**: Mark tasks as completed and confirm `ATTENDEE_TASKS` rows update.
 - **Surveys**: Submit Post-Workshop survey from attendee tab; verify new row in `SURVEY_SUBMISSIONS` and answers in `SURVEY_ANSWERS`.
-- **NL Query**: Run sample prompt in admin NL SQL tab; ensure results return and `NL_QUERY_LOGS` captures entry.
 
 ## Regression Checks
 - Restart API ensuring schema is not dropped (toggle remains false).

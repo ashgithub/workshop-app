@@ -106,13 +106,12 @@ class Config:
         return str(value).lower() == 'true'
 
     @property
-    def proxy_enabled(self) -> bool:
-        value = self._config.get('proxy', {}).get('enabled', os.getenv('PROXY_ENABLED', 'false'))
+    def reset_data_on_startup(self) -> bool:
+        value = self._config.get('app', {}).get('reset_data_on_startup', os.getenv('RESET_DATA_ON_STARTUP', 'false'))
+        if isinstance(value, str) and ':' in value:
+            # Handle EnvYAML default syntax like "True:false"
+            value = value.split(':', 1)[0]
         return str(value).lower() == 'true'
-
-    @property
-    def proxy_prefix(self) -> str:
-        return self._config.get('proxy', {}).get('prefix', os.getenv('PROXY_PREFIX', ''))
 
 
 # Global config instance
