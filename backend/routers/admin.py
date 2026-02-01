@@ -11,6 +11,7 @@ from ..database import db
 # from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
 import select_ai
 from ..config import config
+from ..services import onboarding as onboarding_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -57,68 +58,70 @@ async def get_all_attendees(
     try:
         # Compute intro_completed_count: team + intro + (tl1/tl2/tl3 all filled) + mac_pc (4 fields total)
         intro_count_subquery = """
-        (CASE WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 THEN 1 ELSE 0 END +
-        CASE WHEN s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 1 ELSE 0 END +
-        CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0 
-                AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0 
-                AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
-        CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END) as intro_completed_count
+        (CASE WHEN ir1.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir1.RESPONSE)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ir2.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir2.RESPONSE)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ir3.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir3.RESPONSE)) > 0
+                AND ir4.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir4.RESPONSE)) > 0
+                AND ir5.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir5.RESPONSE)) > 0 THEN 1 ELSE 0 END +
+        CASE WHEN ir6.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir6.RESPONSE)) > 0 THEN 1 ELSE 0 END) as intro_completed_count
         """
         # Base query
         base_query = """
         SELECT
-            s.STUDENT_ID,
-            s.EMAIL_ADDRESS,
-            s.NAME,
-            s.LOCATION,
-            s.TEAM,
-            s.INTRO,
-            s.TL1,
-            s.TL2,
-            s.TL3,
-            s.MAC_PC,
-            s.ACK,
-            s.ON_BOARDED,
-            s.PLAYED_2T1L,
-            COALESCE(task_progress.tasks_completed, 0) as tasks_completed,
-            COALESCE(task_progress.tasks_total, 11) as tasks_total,
+            a.ID,
+            a.EMAIL,
+            a.FULL_NAME,
+            c.LOCATION_NAME,
+            ir1.RESPONSE as TEAM,
+            ir2.RESPONSE as INTRO,
+            ir3.RESPONSE as TL1,
+            ir4.RESPONSE as TL2,
+            ir5.RESPONSE as TL3,
+            ir6.RESPONSE as MAC_PC,
+            CASE WHEN a.ACKNOWLEDGED = 'Y' THEN 'Y' ELSE 'N' END as ACK,
+            CASE WHEN oq_progress.completed_count = oq_progress.total_count THEN 'Y' ELSE 'N' END as ON_BOARDED,
+            'N' as PLAYED_2T1L, -- Placeholder, will be removed
+            COALESCE(oq_progress.completed_count, 0) as tasks_completed,
+            COALESCE(oq_progress.total_count, 11) as tasks_total,
             COALESCE(survey_count.survey_count, 0) as surveys_completed,
             {intro_count},
             CASE
-                WHEN s.ACK = 'Y' THEN 25
+                WHEN a.ACKNOWLEDGED = 'Y' THEN 25
                 ELSE 0
             END +
             CASE
-                WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 AND s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 25
-                ELSE 0
-            END +     
-            CASE
-                WHEN COALESCE(task_progress.tasks_completed, 0) = COALESCE(task_progress.tasks_total, 11) AND COALESCE(task_progress.tasks_total, 11) > 0 THEN 25
+                WHEN ir1.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir1.RESPONSE)) > 0 AND ir2.RESPONSE IS NOT NULL AND LENGTH(TRIM(ir2.RESPONSE)) > 0 THEN 25
                 ELSE 0
             END +
             CASE
-                WHEN (COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) > 0 THEN 25
+                WHEN COALESCE(oq_progress.completed_count, 0) = COALESCE(oq_progress.total_count, 11) AND COALESCE(oq_progress.total_count, 11) > 0 THEN 25
+                ELSE 0
+            END +
+            CASE
+                WHEN COALESCE(survey_count.survey_count, 0) > 0 THEN 25
                 ELSE 0
             END as overall_progress
-        FROM STUDENTS s
+        FROM ATTENDEES a
+        JOIN COHORTS c ON c.ID = a.COHORT_ID
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir1 ON ir1.ATTENDEE_ID = a.ID AND ir1.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'team_name')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir2 ON ir2.ATTENDEE_ID = a.ID AND ir2.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'intro')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir3 ON ir3.ATTENDEE_ID = a.ID AND ir3.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_1')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir4 ON ir4.ATTENDEE_ID = a.ID AND ir4.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_2')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir5 ON ir5.ATTENDEE_ID = a.ID AND ir5.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_3')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir6 ON ir6.ATTENDEE_ID = a.ID AND ir6.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'device_pref')
         LEFT JOIN (
             SELECT
-                STUDENT_ID,
-                COUNT(*) as tasks_total,
-                COUNT(CASE WHEN COMPLETED = 'Y' THEN 1 END) as tasks_completed
-            FROM ONBOARDING_TASKS
-            GROUP BY STUDENT_ID
-        ) task_progress ON s.STUDENT_ID = task_progress.STUDENT_ID
+                ATTENDEE_ID,
+                COUNT(*) as total_count,
+                COUNT(CASE WHEN RESPONSE IS NOT NULL AND LENGTH(TRIM(RESPONSE)) > 0 THEN 1 END) as completed_count
+            FROM ATTENDEE_ONBOARDING_RESPONSES
+            GROUP BY ATTENDEE_ID
+        ) oq_progress ON a.ID = oq_progress.ATTENDEE_ID
         LEFT JOIN (
-            SELECT STUDENT_ID, COUNT(*) as survey_count
-            FROM SURVEY_RESPONSES
-            GROUP BY STUDENT_ID
-        ) survey_count ON s.STUDENT_ID = survey_count.STUDENT_ID
-        LEFT JOIN (
-            SELECT STUDENT_ID, 1 as has_feedback
-            FROM WORKSHOP_FEEDBACK
-            GROUP BY STUDENT_ID
-        ) wf ON s.STUDENT_ID = wf.STUDENT_ID
+            SELECT ATTENDEE_ID, COUNT(*) as survey_count
+            FROM SURVEY_SUBMISSIONS
+            GROUP BY ATTENDEE_ID
+        ) survey_count ON a.ID = survey_count.ATTENDEE_ID
         WHERE 1=1
         """
 
@@ -126,45 +129,37 @@ async def get_all_attendees(
         conditions = []
 
         if location:
-            conditions.append("s.LOCATION = :location")
+            conditions.append("c.LOCATION_NAME = :location")
             params["location"] = location
-            
+
         if intro_lt is not None:
-            conditions.append("""(
-                CASE WHEN s.TEAM IS NOT NULL AND LENGTH(TRIM(s.TEAM)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.INTRO IS NOT NULL AND LENGTH(TRIM(s.INTRO)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.TL1 IS NOT NULL AND LENGTH(TRIM(s.TL1)) > 0
-                        AND s.TL2 IS NOT NULL AND LENGTH(TRIM(s.TL2)) > 0
-                        AND s.TL3 IS NOT NULL AND LENGTH(TRIM(s.TL3)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.MAC_PC IS NOT NULL AND LENGTH(TRIM(s.MAC_PC)) > 0 THEN 1 ELSE 0 END +
-                CASE WHEN s.TSHIRT_SIZE IS NOT NULL AND LENGTH(TRIM(s.TSHIRT_SIZE)) > 0 THEN 1 ELSE 0 END
-            ) <= :intro_lt""")
+            conditions.append("intro_completed_count <= :intro_lt")
             params["intro_lt"] = intro_lt
 
         if onboarding_lt is not None:
-            conditions.append("COALESCE(task_progress.tasks_completed, 0) <= :onboarding_lt")
+            conditions.append("COALESCE(oq_progress.completed_count, 0) <= :onboarding_lt")
             params["onboarding_lt"] = onboarding_lt
 
         if survey_lt is not None:
-            conditions.append("(COALESCE(survey_count.survey_count, 0) + COALESCE(wf.has_feedback, 0)) <= :survey_lt")
+            conditions.append("COALESCE(survey_count.survey_count, 0) <= :survey_lt")
             params["survey_lt"] = survey_lt
 
         if ack_filter and ack_filter != "any":
             ack_upper = ack_filter.upper()
             if ack_upper == "Y":
-                conditions.append("s.ACK = 'Y'")
+                conditions.append("a.ACKNOWLEDGED = 'Y'")
             elif ack_upper == "N":
-                conditions.append("(s.ACK != 'Y' OR s.ACK IS NULL)")
+                conditions.append("(a.ACKNOWLEDGED != 'Y' OR a.ACKNOWLEDGED IS NULL)")
 
         where_clause = " AND ".join(conditions) if conditions else ""
 
         # Sorting
-        valid_sort_fields = ["s.NAME", "s.LOCATION", "overall_progress", "intro_completed_count", "tasks_completed", "surveys_completed", "s.ACK"]
-        sort_field = next((field for field in valid_sort_fields if sort_by.lower() in field.lower()), "s.NAME")
+        valid_sort_fields = ["a.FULL_NAME", "c.LOCATION_NAME", "overall_progress", "intro_completed_count", "tasks_completed", "surveys_completed", "a.ACKNOWLEDGED"]
+        sort_field = next((field for field in valid_sort_fields if sort_by.lower() in field.lower()), "a.FULL_NAME")
         if sort_by == "name":
-            sort_field = "s.NAME"
+            sort_field = "a.FULL_NAME"
         elif sort_by == "location":
-            sort_field = "s.LOCATION"
+            sort_field = "c.LOCATION_NAME"
         elif sort_by == "overall_progress":
             sort_field = "overall_progress"
         elif sort_by == "intro_completed":
@@ -174,9 +169,9 @@ async def get_all_attendees(
         elif sort_by == "surveys_completed":
             sort_field = "surveys_completed"
         elif sort_by == "ack":
-            sort_field = "s.ACK"
+            sort_field = "a.ACKNOWLEDGED"
         else:
-            sort_field = "s.NAME"
+            sort_field = "a.FULL_NAME"
 
         order_by = f"ORDER BY {sort_field} {(order or 'asc').upper()}"
 
@@ -271,10 +266,10 @@ async def get_locations():
     """
     try:
         result = db.execute_query("""
-            SELECT DISTINCT LOCATION
-            FROM STUDENTS
-            WHERE LOCATION IS NOT NULL
-            ORDER BY LOCATION
+            SELECT DISTINCT LOCATION_NAME
+            FROM COHORTS
+            WHERE LOCATION_NAME IS NOT NULL
+            ORDER BY LOCATION_NAME
         """)
 
         locations = [row[0] for row in result] if result else []
@@ -285,144 +280,77 @@ async def get_locations():
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/game/progress")
-async def get_game_progress(location: Optional[str] = None):
+# Game functionality removed - was dependent on legacy STUDENTS table
+# @router.get("/game/progress")
+# @router.get("/game/next")
+# @router.put("/game/played/{student_id}")
+# @router.put("/game/reset")
+
+
+# Onboarding Questions Management
+@router.get("/onboarding/questions")
+async def list_onboarding_questions(include_inactive: bool = False):
     """
-    Get progress for 2 Truths and a Lie game: number played vs total attendees for a location.
+    Get all onboarding questions for admin management.
     """
     try:
-        if not location:
-            raise HTTPException(status_code=400, detail="Location parameter required")
-
-        # Total: all attendees in location
-        total_result = db.execute_query("""
-            SELECT COUNT(*) FROM STUDENTS 
-            WHERE LOCATION = :location
-        """, {"location": location})
-        total = total_result[0][0] if total_result and len(total_result) > 0 else 0
-
-        # Played: PLAYED_2T1L = 'Y'
-        played_result = db.execute_query("""
-            SELECT COUNT(*) FROM STUDENTS 
-            WHERE LOCATION = :location 
-            AND PLAYED_2T1L = 'Y'
-        """, {"location": location})
-        played_count = played_result[0][0] if played_result and len(played_result) > 0 else 0
-
-        return {"played": played_count, "total": total, "progress": f"{played_count}/{total}"}
-
-    except HTTPException:
-        raise
+        return onboarding_service.list_questions(include_inactive)
     except Exception as e:
-        logger.error(f"Error getting game progress for location {location}: {e}")
+        logger.error(f"Error listing onboarding questions: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/game/next")
-async def get_next_game_attendee(location: Optional[str] = None):
+@router.get("/onboarding/questions/{question_id}")
+async def get_onboarding_question(question_id: int):
     """
-    Get random unplayed attendee from specified location for 2 Truths and a Lie game.
+    Get a specific onboarding question.
     """
     try:
-        if not location:
-            raise HTTPException(status_code=400, detail="Location parameter required")
-
-        # Get random attendee who hasn't played (all are eligible, even without statements)
-        result = db.execute_query("""
-            SELECT STUDENT_ID, NAME, EMAIL_ADDRESS, TEAM, LOCATION, INTRO, TL1, TL2, TL3, FACE_IMAGE
-            FROM STUDENTS
-            WHERE LOCATION = :location
-            AND (PLAYED_2T1L IS NULL OR PLAYED_2T1L = 'N')
-            ORDER BY DBMS_RANDOM.VALUE
-            FETCH FIRST 1 ROW ONLY
-        """, {"location": location})
-
-        if not result:
-            return {"attendee": None, "message": f"All attendees from {location} have played"}
-
-        row = result[0]
-        attendee = {
-            "student_id": row[0],
-            "name": row[1],
-            "email_address": row[2],
-            "team": row[3],
-            "location": row[4],
-            "intro": row[5],
-            "tl1": row[6],
-            "tl2": row[7],
-            "tl3": row[8],
-            "image_filename": row[9]
-        }
-
-        return {"attendee": attendee}
-
+        question = onboarding_service.get_question(question_id)
+        if not question:
+            raise HTTPException(status_code=404, detail="Question not found")
+        return question
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting next game attendee for location {location}: {e}")
+        logger.error(f"Error getting onboarding question {question_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.put("/game/played/{student_id}")
-async def mark_attendee_as_played(student_id: str):
+@router.post("/onboarding/questions")
+async def create_onboarding_question(payload: dict):
     """
-    Mark attendee as having played the 2 Truths and a Lie game.
+    Create a new onboarding question.
     """
     try:
-        # Check if student exists
-        student_check = db.execute_query(
-            "SELECT STUDENT_ID FROM STUDENTS WHERE STUDENT_ID = :id",
-            {"id": student_id}
-        )
-        if not student_check:
-            raise HTTPException(status_code=404, detail="Attendee not found")
-
-        # Update played status
-        affected_rows = db.execute_dml(
-            "UPDATE STUDENTS SET PLAYED_2T1L = 'Y' WHERE STUDENT_ID = :student_id",
-            {"student_id": student_id}
-        )
-
-        if affected_rows == 0:
-            raise HTTPException(status_code=404, detail="Attendee not found")
-
-        return {"message": "Attendee marked as played"}
-
-    except HTTPException:
-        raise
+        question_id = onboarding_service.create_question(payload)
+        return {"id": question_id, "message": "Question created"}
     except Exception as e:
-        logger.error(f"Error marking attendee {student_id} as played: {e}")
+        logger.error(f"Error creating onboarding question: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.put("/game/reset")
-async def reset_game_flags(location: Optional[str] = None):
+@router.put("/onboarding/questions/{question_id}")
+async def update_onboarding_question(question_id: int, payload: dict):
     """
-    Reset PLAYED_2T1L flags to 'N' for all attendees in a specific location.
-    If no location provided, resets all attendees.
+    Update an onboarding question.
     """
     try:
-        if not location:
-            raise HTTPException(status_code=400, detail="Location parameter required for targeted reset. Omit for global reset.")
-
-        # Check if location exists
-        location_check = db.execute_query(
-            "SELECT COUNT(*) FROM STUDENTS WHERE LOCATION = :location",
-            {"location": location}
-        )
-        if not location_check or location_check[0][0] == 0:
-            raise HTTPException(status_code=404, detail="No attendees found for the specified location")
-
-        # Update played status to reset
-        affected_rows = db.execute_dml(
-            "UPDATE STUDENTS SET PLAYED_2T1L = 'N' WHERE LOCATION = :location",
-            {"location": location}
-        )
-
-        return {"message": f"Reset {affected_rows} attendees from location {location} to unplayed status"}
-
-    except HTTPException:
-        raise
+        onboarding_service.update_question(question_id, payload)
+        return {"message": "Question updated"}
     except Exception as e:
-        logger.error(f"Error resetting game flags for location {location}: {e}")
+        logger.error(f"Error updating onboarding question {question_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/onboarding/questions/reorder")
+async def reorder_onboarding_questions(order_map: list[dict]):
+    """
+    Reorder onboarding questions.
+    """
+    try:
+        onboarding_service.reorder_questions(order_map)
+        return {"message": "Questions reordered"}
+    except Exception as e:
+        logger.error(f"Error reordering onboarding questions: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

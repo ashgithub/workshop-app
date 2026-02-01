@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ...services import attendees as attendee_service
+from ...services import onboarding as onboarding_service
 
 
 class AckRequest(BaseModel):
@@ -26,6 +27,7 @@ async def get_attendee(attendee_id: int):
         progress = attendee_service.get_progress(attendee_id)
         attendee["progress"] = progress
         attendee["intros"] = attendee_service.get_intro_responses(attendee_id)
+        attendee["onboarding"] = onboarding_service.list_attendee_responses(attendee_id)
         return attendee
     except HTTPException:
         raise

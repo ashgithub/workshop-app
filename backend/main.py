@@ -22,8 +22,9 @@ from backend.routers import auth as auth_router_module
 from backend.routers.v2 import attendees as attendees_router_module
 from backend.routers.v2 import cohorts as cohorts_router_module
 from backend.routers.v2 import intros as intros_router_module
+from backend.routers.v2 import onboarding as onboarding_router_module
 from backend.routers.v2 import surveys as surveys_router_module
-from backend.routers.v2 import tasks as tasks_router_module
+# from backend.routers.v2 import tasks as tasks_router_module  # Removed - legacy task system
 
 
 @asynccontextmanager
@@ -106,7 +107,8 @@ app.include_router(auth_router_module.router, prefix="/api", tags=["authenticati
 app.include_router(attendees_router_module.router, prefix="/api")
 app.include_router(cohorts_router_module.router, prefix="/api")
 app.include_router(intros_router_module.router, prefix="/api")
-app.include_router(tasks_router_module.router, prefix="/api")
+app.include_router(onboarding_router_module.router, prefix="/api")
+# app.include_router(tasks_router_module.router, prefix="/api")  # Removed - legacy task system
 app.include_router(surveys_router_module.router, prefix="/api")
 
 

@@ -5,6 +5,7 @@ from typing import Optional
 
 from backend.database import db
 from backend.services import intros as intro_service
+from backend.services import onboarding as onboarding_service
 
 
 def get_attendee(attendee_id: int) -> Optional[dict]:
@@ -43,11 +44,15 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
 
 
 def get_progress(attendee_id: int) -> dict:
-    tasks = db.fetch_one(
+    onboarding = db.fetch_one(
         """
-        SELECT COUNT(*), COUNT(CASE WHEN STATUS = 'COMPLETED' THEN 1 END)
-        FROM ATTENDEE_TASKS
-        WHERE ATTENDEE_ID = :attendee_id
+        SELECT
+            COUNT(*) AS total_questions,
+            COUNT(CASE WHEN r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 END) AS answered
+        FROM ONBOARDING_QUESTIONS q
+        LEFT JOIN ATTENDEE_ONBOARDING_RESPONSES r
+            ON r.QUESTION_ID = q.ID AND r.ATTENDEE_ID = :attendee_id
+        WHERE q.ACTIVE = 'Y'
         """,
         {"attendee_id": attendee_id},
     ) or (0, 0)
@@ -88,8 +93,8 @@ def get_progress(attendee_id: int) -> dict:
     )
     ack_completed = bool(ack_row and ack_row[0] == 'Y')
 
-    completed_tasks = tasks[1]
-    total_tasks = tasks[0]
+    completed_onboarding = onboarding[1]
+    total_onboarding = onboarding[0]
     total_surveys_completed = submissions[0]
     total_surveys_available = survey_templates[0] or 0
     if total_surveys_available == 0 and total_surveys_completed > 0:
@@ -101,8 +106,8 @@ def get_progress(attendee_id: int) -> dict:
     progress_components = []
     if ack_total:
         progress_components.append(1.0 if ack_completed else 0.0)
-    if total_tasks:
-        progress_components.append(completed_tasks / total_tasks)
+    if total_onboarding:
+        progress_components.append(completed_onboarding / total_onboarding)
     if intro_total:
         progress_components.append(intro_completed / intro_total)
     if total_surveys_available:
@@ -115,8 +120,8 @@ def get_progress(attendee_id: int) -> dict:
         overall = int(sum(progress_components) / len(progress_components) * 100)
 
     return {
-        "tasks_completed": completed_tasks,
-        "tasks_total": total_tasks,
+        "tasks_completed": completed_onboarding,
+        "tasks_total": total_onboarding,
         "surveys_completed": total_surveys_completed,
         "surveys_total": total_surveys_available,
         "intro_completed": intro_completed,

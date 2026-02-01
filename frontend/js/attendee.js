@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     attachTabs();
     loadAttendee(attendeeId);
-    document.getElementById('refresh-tasks')?.addEventListener('click', () => loadTasks(attendeeId));
+    document.getElementById('refresh-tasks')?.addEventListener('click', () => loadAttendee(attendeeId));
 
     const closeBtn = document.querySelector('.close');
     if (closeBtn) {
@@ -109,7 +109,7 @@ async function loadAttendee(attendeeId) {
         renderProfile(attendee);
         renderProgress(attendee.progress || {});
         renderIntroductions(attendee.intros || [], attendee.progress || {}, attendee.acknowledged || false);
-        await loadTasks(attendeeId);
+        renderOnboarding(attendeeId, attendee.onboarding || []);
         await loadSurveys(attendeeId);
     } catch (error) {
         console.error('Failed to load attendee', error);
@@ -270,71 +270,129 @@ function renderProgress(progress) {
 
 }
 
-async function loadTasks(attendeeId) {
+async function loadOnboarding(attendeeId) {
     try {
-        const response = await apiFetch(`/api/tasks/attendees/${attendeeId}`);
+        const response = await apiFetch(`/api/onboarding/attendees/${attendeeId}`);
         if (!response.ok) {
             throw new Error(await response.text());
         }
-        const tasks = await response.json();
-        renderTasks(attendeeId, tasks);
+        const onboarding = await response.json();
+        renderOnboarding(attendeeId, onboarding);
     } catch (error) {
-        console.error('Failed to load tasks', error);
-        renderTasks(attendeeId, []);
+        console.error('Failed to load onboarding', error);
+        renderOnboarding(attendeeId, []);
     }
 }
 
-function renderTasks(attendeeId, tasks) {
+function renderOnboarding(attendeeId, onboarding) {
     const container = document.getElementById('task-list');
     if (!container) return;
-    if (!tasks.length) {
-        container.innerHTML = '<p>No tasks assigned yet. Check back soon!</p>';
+    if (!onboarding.length) {
+        container.innerHTML = '<p>Onboarding checklist will appear here once available.</p>';
         return;
     }
 
-    container.innerHTML = tasks
-        .map(task => {
-            const completed = task.status === 'COMPLETED';
-            return `
-                <div class="task-item ${completed ? 'completed' : ''}">
-                    <div>
-                        <h4>${task.title}</h4>
-                        ${task.description ? `<p class="task-description">${task.description}</p>` : ''}
-                        ${task.instructions_url ? `<a href="${task.instructions_url}" target="_blank" rel="noopener">View instructions</a>` : ''}
-                    </div>
-                    <div class="task-actions">
-                        <label class="switch">
-                            <input type="checkbox" data-task-id="${task.task_id}" ${completed ? 'checked' : ''}>
-                            <span>Done</span>
-                        </label>
+    const completed = onboarding.filter(o => o.response && o.response.trim()).length;
+    const total = onboarding.length;
+
+    let html = `
+        <div class="onboarding-header">
+            <div class="progress-pill" id="onboarding-progress-pill">${completed} of ${total} completed</div>
+        </div>
+        <div class="onboarding-fields">
+    `;
+
+    onboarding.forEach((item, index) => {
+        const answered = item.response && item.response.trim().length > 0;
+        const renderer = getOnboardingRenderer(item);
+        const statusClass = answered ? 'complete' : 'pending';
+
+        html += `
+            <div class="field-group ${answered ? 'completed' : ''}" data-question-group="${item.question_id}">
+                <div class="field-header">
+                    <div class="field-title">${index + 1}. ${item.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${answered ? '✓' : '○'}</span>
+                        ${answered ? 'Complete' : 'Pending'}
                     </div>
                 </div>
-            `;
-        })
-        .join('');
+                <div class="intro-input">
+                    ${renderer(item, item.response || '')}
+                </div>
+            </div>
+        `;
+    });
 
-    container.querySelectorAll('input[type="checkbox"]').forEach(box => {
-        box.addEventListener('change', async event => {
-            const taskId = Number(event.target.getAttribute('data-task-id'));
-            const status = event.target.checked ? 'COMPLETED' : 'PENDING';
+    html += `<button class="btn-primary save-all-btn" id="save-all-onboarding">Save All Changes</button>`;
+    html += `</div>`;
+
+    container.innerHTML = html;
+
+    // Update progress pill
+    const pill = document.getElementById('onboarding-progress-pill');
+    if (pill) {
+        const percent = total ? Math.round((completed / total) * 100) : 0;
+        pill.textContent = `${completed} of ${total} completed`;
+    }
+
+    // Individual Save Listeners
+    container.querySelectorAll('[data-question]').forEach(input => {
+        input.addEventListener('change', async (event) => {
+            const questionId = Number(event.target.dataset.question);
+            const question = onboarding.find(item => item.question_id === questionId);
+            if (!question) return;
+            const container = event.target.closest('.field-group');
+            const response = getOnboardingInputValue(question, container);
+            if (response === (question.response || '')) return;
+
             try {
-                const response = await apiFetch(`/api/tasks/attendees/${attendeeId}/${taskId}`, {
-                    method: 'PUT',
+                const saveResponse = await apiFetch(`/api/onboarding/attendees/${attendeeId}/${questionId}`, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status }),
+                    body: JSON.stringify({ response }),
                 });
-                if (!response.ok) {
-                    throw new Error(await response.text());
+                if (!saveResponse.ok) {
+                    throw new Error(await saveResponse.text());
                 }
-                showMessage('Task updated', 'success');
+                showSuccess('Saved');
                 loadAttendee(attendeeId);
             } catch (error) {
-                console.error('Task update failed', error);
-                showMessage('Unable to update task. Please retry.', 'error');
-                event.target.checked = !event.target.checked;
+                console.error('Failed to save onboarding response', error);
+                showMessage('Save failed. Please retry.', 'error');
             }
         });
     });
+
+    // Save All Button
+    const saveAllBtn = document.getElementById('save-all-onboarding');
+    if (saveAllBtn) {
+        saveAllBtn.addEventListener('click', async () => {
+            let saveCount = 0;
+            for (const question of onboarding) {
+                const container = document.querySelector(`[data-question-group="${question.question_id}"]`);
+                const response = container ? getOnboardingInputValue(question, container) : '';
+                if (response === (question.response || '')) continue;
+                try {
+                    const saveResponse = await apiFetch(`/api/onboarding/attendees/${attendeeId}/${question.question_id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ response }),
+                    });
+                    if (saveResponse.ok) {
+                        saveCount++;
+                    }
+                } catch (error) {
+                    console.error('Save failed for', question.code, error);
+                }
+            }
+            if (saveCount > 0) {
+                showSuccess(`${saveCount} changes saved`);
+                loadAttendee(attendeeId);
+            } else {
+                showMessage('No changes to save.', 'info');
+            }
+        });
+    }
 }
 
 async function loadSurveys(attendeeId) {
@@ -446,6 +504,46 @@ function getInputValue(intro, container) {
         return checked?.value || '';
     }
     const field = container.querySelector(`[data-question="${intro.question_id}"]`);
+    return field?.value || '';
+}
+
+const onboardingRenderers = {
+    text: (question, value = '') =>
+        `<input type="text" data-question="${question.question_id}" value="${value}" placeholder="Enter your response...">`,
+    textarea: (question, value = '') =>
+        `<textarea data-question="${question.question_id}" placeholder="Enter your response...">${value}</textarea>`,
+    choice: (question, value = '') => {
+        const options = question.config?.options || [];
+        return `
+            <div class="choice-group" role="radiogroup" aria-label="${question.prompt}">
+                ${options
+                    .map(option => {
+                        const checked = option.value === value ? 'checked' : '';
+                        return `
+                            <label class="choice-option">
+                                <input type="radio" name="onboarding-choice-${question.question_id}" value="${option.value}" data-question="${question.question_id}" ${checked}>
+                                <span>${option.label}</span>
+                            </label>
+                        `;
+                    })
+                    .join('')}
+            </div>
+        `;
+    },
+};
+
+function getOnboardingRenderer(question) {
+    const type = question.question_type || 'text';
+    return onboardingRenderers[type] || onboardingRenderers.text;
+}
+
+function getOnboardingInputValue(question, container) {
+    const type = question.question_type || 'text';
+    if (type === 'choice') {
+        const checked = container.querySelector(`input[data-question="${question.question_id}"]:checked`);
+        return checked?.value || '';
+    }
+    const field = container.querySelector(`[data-question="${question.question_id}"]`);
     return field?.value || '';
 }
 
