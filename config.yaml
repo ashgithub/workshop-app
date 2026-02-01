@@ -1,4 +1,4 @@
-# Workshop Survey Configuration
+# AI Workshop Companion Configuration
 database:
   wallet: $ORACLE_WALLET
   wallet_pass: $ORACLE_WALLET_PASS
@@ -7,15 +7,12 @@ database:
   dsn: $ORACLE_DSN  # e.g., "host:port/service_name"
   select_ai_profile: workshop_app_profile
 
-openai:
-  api_key: $OPENAI_API_KEY
-  base_url: $OPENAI_BASE_URL  # Optional, for OpenAI-compatible APIs
-
 app:
   debug: $DEBUG:false  # Set to true for development
   secret_key:  $SECRET_KEY:your-secret-key-change-in-production
+  reset_schema_on_startup: $RESET_SCHEMA_ON_STARTUP:false
 
 proxy:
-  enabled: $PROXY  # Set to true when running behind nginx proxy
-  prefix: "/workshop-app"  # URL prefix when behind proxy (e.g., "/workshop-app")
-  bearer_token: $MINI_BEAERER  # Bearer token required for proxy authentication
+  enabled: $PROXY_ENABLED:false
+  prefix: $PROXY_PREFIX:/workshop-app
+  bearer_token: $PROXY_BEARER_TOKEN

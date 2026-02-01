@@ -3,72 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workshop Survey - Admin Dashboard</title>
+    <title>AI Workshop Companion - Admin Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
     <script>
-        // Proxy configuration injected by backend
-        window.PROXY_CONFIG = {
-            enabled: false,  // Will be set to true when proxy.enabled
-            bearerToken: ""  // Will contain the bearer token
+        window.PROXY_CONFIG = window.PROXY_CONFIG || {
+            enabled: false,
+            basePath: '',
+            bearerToken: ''
         };
     </script>
 </head>
 <body>
-    <div class="container">
-        <div class="admin-dashboard">
-            <h1>Workshop Admin Dashboard</h1>
-            <p>Manage workshop attendees and view analytics.</p>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="attendees">Attendee List</button>
-                <button class="tab-btn" data-tab="queries">Natural Language Queries</button>
-                <button class="tab-btn" data-tab="game">2 Truths and a Lie Game</button>
+    <div class="page-shell">
+        <header class="page-header">
+            <div class="container">
+                <h1>AI Workshop Companion</h1>
+                <p class="section-subtext">Monitor onboarding progress and curate cohort experiences.</p>
             </div>
+        </header>
 
-            <div id="attendees-tab" class="tab-content active">
-                <h2>Attendee List</h2>
-                <div class="filters" style="margin: 20px 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
-                    <label>Location: <select id="filter-location">
-                        <option value="">Any</option>
-                    </select></label>
-                    <label>Intro <= : <input type="number" id="filter-intro-lt" min="1" max="4" value="" placeholder="e.g. 2" style="width: 60px;"></label>
-                    <label>Onboarding <= : <input type="number" id="filter-onboarding-lt" min="1" max="11" value="" placeholder="e.g. 5" style="width: 60px;"></label>
-                    <label>Survey <= : <input type="number" id="filter-survey-lt" min="1" max="11" value="" placeholder="e.g. 3" style="width: 60px;"></label>
-                    <label>ACK: <select id="filter-ack">
-                        <option value="any">Any</option>
-                        <option value="Y">Yes</option>
-                        <option value="N">No</option>
-                    </select></label>
-                    <button class="btn-primary" id="apply-filters">Apply Filters</button>
-                    <button class="btn-secondary" id="clear-filters">Clear</button>
+        <main class="container">
+            <div class="admin-dashboard card">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="cohorts">Cohorts</button>
+                    <button class="tab-btn" data-tab="tasks">Onboarding Templates</button>
+                    <button class="tab-btn" data-tab="surveys">Surveys</button>
+                    <button class="tab-btn" data-tab="queries">NL SQL</button>
                 </div>
-                <button class="btn-primary" id="export-csv-static">Export to CSV</button>
-            </div>
 
-            <div id="queries-tab" class="tab-content">
-                <h2>Natural Language Queries</h2>
-                <p>Ask questions about your workshop data.</p>
-                <div class="query-form">
-                    <input type="text" placeholder="How many people completed onboarding?" id="query-input">
-                    <button class="btn-primary" id="query-btn">Ask Question</button>
-                </div>
-                <div id="query-results"></div>
-            </div>
+                <section id="cohorts-tab" class="tab-content active">
+                    <div class="section-header">
+                        <div>
+                            <h2>Cohorts</h2>
+                            <p class="section-subtext">Create and manage workshop cohorts, then invite attendees.</p>
+                        </div>
+                        <button class="btn-primary" id="new-cohort-btn">New Cohort</button>
+                    </div>
+                    <div id="cohort-grid" class="cohort-grid"></div>
+                </section>
 
-            <div id="game-tab" class="tab-content">
-                <h2>2 Truths and a Lie Game <span id="game-progress" class="progress-indicator" style="display: none;"></span></h2>
-                <p>Interactive icebreaker game for workshop attendees.</p>
-                <div class="game-controls">
-                    <select id="location-select">
-                        <option value="">Select Location</option>
-                    </select>
-                    <button class="btn-primary" id="start-game-btn" style="margin-left: 10px;">Start Game</button>
-                    <button class="btn-secondary" id="reset-game-btn" style="margin-left: 10px;">Reset Game for Location</button>
-                </div>
-                <div id="game-display"></div>
+                <section id="tasks-tab" class="tab-content">
+                    <div class="section-header">
+                        <div>
+                            <h2>Onboarding Templates</h2>
+                            <p class="section-subtext">Update the pre-work checklist shared with attendees.</p>
+                        </div>
+                        <button class="btn-primary" id="new-template-btn">New Template</button>
+                    </div>
+                    <div id="template-list" class="template-list"></div>
+                </section>
+
+                <section id="surveys-tab" class="tab-content">
+                    <div class="section-header">
+                        <div>
+                            <h2>Survey Catalog</h2>
+                            <p class="section-subtext">Design the feedback flows for workshop days.</p>
+                        </div>
+                        <button class="btn-primary" id="new-survey-btn">New Survey</button>
+                    </div>
+                    <div id="survey-list" class="survey-list"></div>
+                </section>
+
+                <section id="queries-tab" class="tab-content">
+                    <div class="section-header">
+                        <div>
+                            <h2>Natural Language SQL</h2>
+                            <p class="section-subtext">Ask Oracle Select AI questions about your cohorts.</p>
+                        </div>
+                    </div>
+                    <div class="query-panel">
+                        <textarea id="query-input" rows="3" placeholder="How many attendees completed the checklist?"></textarea>
+                        <div class="query-actions">
+                            <button class="btn-primary" id="query-btn">Run Query</button>
+                        </div>
+                    </div>
+                    <div id="query-results" class="query-results"></div>
+                </section>
             </div>
-        </div>
+        </main>
+
+        <footer class="site-footer">© 2026 Oracle AI Workshop Companion</footer>
     </div>
+
     <script src="js/admin.js"></script>
 </body>
 </html>

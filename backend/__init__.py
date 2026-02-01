@@ -1,1 +1,1 @@
-# Workshop Survey Backend
+# AI Workshop Companion Backend

@@ -1,200 +1,215 @@
-"""
-Pydantic schemas for API request/response validation.
-"""
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+"""Pydantic schemas for the rebuilt workshop system."""
+from __future__ import annotations
+
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, EmailStr, Field
 
 
-# Student/Attendee schemas
-class StudentBase(BaseModel):
-    email_address: EmailStr
-    name: Optional[str] = None
-    location: Optional[str] = Field(None, max_length=3)
-    manager: Optional[str] = None
-    job_id: Optional[str] = None
-    intro: Optional[str] = Field(None, max_length=1000)
-    tl1: Optional[str] = Field(None, max_length=500)
-    tl2: Optional[str] = Field(None, max_length=500)
-    tl3: Optional[str] = Field(None, max_length=500)
-    ack: Optional[str] = Field(None, pattern=r'^[YN]$')
-    on_boarded: Optional[str] = Field(None, pattern=r'^[YN]$')
-    tf: Optional[str] = Field(None, pattern=r'^[YN]$')
-    team: Optional[str] = None
-    face_image: Optional[str] = None
-    mac_pc: Optional[str] = Field(None, pattern=r'^[MP]$')
-    tshirt_size: Optional[str] = Field(None, max_length=10)
-    image_filename: Optional[str] = None
-    onboarding_comments: Optional[str] = None
-    played_2t1l: Optional[str] = Field('N', pattern=r'^[YN]$')
-
-
-class StudentCreate(StudentBase):
-    student_id: str = Field(..., max_length=50)
-
-
-class StudentUpdate(BaseModel):
-    name: Optional[str] = None
-    location: Optional[str] = Field(None, max_length=3)
-    manager: Optional[str] = None
-    job_id: Optional[str] = None
-    intro: Optional[str] = Field(None, max_length=1000)
-    tl1: Optional[str] = Field(None, max_length=500)
-    tl2: Optional[str] = Field(None, max_length=500)
-    tl3: Optional[str] = Field(None, max_length=500)
-    ack: Optional[str] = Field(None, pattern=r'^[YN]$')
-    team: Optional[str] = None
-    mac_pc: Optional[str] = Field(None, pattern=r'^[MP]$')
-    tshirt_size: Optional[str] = Field(None, max_length=10)
-    onboarding_comments: Optional[str] = None
-
-
-class Student(StudentBase):
-    student_id: str
-
-    class Config:
-        from_attributes = True
-
-
-# Onboarding Tasks schemas
-class TaskBase(BaseModel):
-    task_code: str = Field(..., max_length=50)
-    completed: str = Field('N', pattern=r'^[YN]$')
-
-
-class TaskCreate(TaskBase):
-    student_id: str = Field(..., max_length=50)
-
-
-class TaskUpdate(BaseModel):
-    completed: str = Field(..., pattern=r'^[YN]$')
-
-
-class TaskCompletionUpdate(BaseModel):
-    task_code: str = Field(..., max_length=50)
-    completed: str = Field(..., pattern=r'^[YN]$')
-
-
-class Task(BaseModel):
-    task_id: int
-    student_id: str
-    task_code: str
-    completed: str
-
-    class Config:
-        from_attributes = True
-
-
-# Survey Response schemas
-class SurveyResponseBase(BaseModel):
-    survey_type: str
-    rating: int = Field(..., ge=1, le=5)
-    what_liked: Optional[str] = Field(None, max_length=2000)
-    what_better: Optional[str] = Field(None, max_length=2000)
-    comments: Optional[str] = None
-
-
-class SurveyResponseCreate(SurveyResponseBase):
-    student_id: str = Field(..., max_length=50)
-
-
-class SurveyResponse(SurveyResponseBase):
-    response_id: int
-    student_id: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# Workshop Feedback schemas
-class WorkshopFeedbackBase(BaseModel):
-    overall_rating: int = Field(..., ge=1, le=5)
-    overall_liked: Optional[str] = None
-    overall_better: Optional[str] = None
-
-
-class WorkshopFeedbackCreate(WorkshopFeedbackBase):
-    student_id: str = Field(..., max_length=50)
-
-
-class WorkshopFeedback(WorkshopFeedbackBase):
-    feedback_id: int
-    student_id: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# Progress and summary schemas
-class IntroProgress(BaseModel):
-    team_completed: bool
-    intro_completed: bool
-    truths_completed: bool
-    device_completed: bool
-    tshirt_completed: bool
-class ProgressInfo(BaseModel):
-    ack_completed: bool
-    intro_completed: bool
-    intro_fields_completed: int
-    intro_fields_total: int
-    intro_details: IntroProgress
-    tasks_completed: int
-    tasks_total: int
-    surveys_submitted: bool
-    surveys_completed: int
-    surveys_total: int
-    overall_progress: int  # percentage
-
-
-class Location(BaseModel):
-    code: str = Field(..., max_length=3)
-    name: str
-    room: str
-    meeting_time: str
-    agenda_image_path: str
-
-    class Config:
-        from_attributes = True
-
-
-class StudentWithProgress(Student):
-    progress: ProgressInfo
-    location: Optional[Location] = None
-
-
-# Authentication schemas
+# ---------------------------------------------------------------------------
+# Auth & Admin
+# ---------------------------------------------------------------------------
 class LoginRequest(BaseModel):
     email: EmailStr
+    is_admin: bool = False
+    admin_password: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
-    student_id: str
+    user_id: str
     name: Optional[str]
     is_admin: bool = False
+    cohort_id: Optional[int] = None
 
 
-# Admin schemas
-class AdminQueryRequest(BaseModel):
-    query: str
+class AdminPasswordRequest(BaseModel):
+    password: str
 
 
-class AdminQueryResponse(BaseModel):
-    query: str
-    results: List[dict]
-    summary: str
+class AdminInviteRequest(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = None
 
 
-class GameAttendee(BaseModel):
-    student_id: str
+class AdminUser(BaseModel):
+    admin_id: int
+    email: EmailStr
+    full_name: Optional[str]
+    is_active: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Cohorts & Attendees
+# ---------------------------------------------------------------------------
+class CohortBase(BaseModel):
+    cohort_code: str
+    title: str
+    location_name: str
+    address: Optional[str] = None
+    room: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    agenda_url: Optional[str] = None
+
+
+class CohortCreate(CohortBase):
+    pass
+
+
+class Cohort(CohortBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class AttendeeBase(BaseModel):
+    cohort_id: int
+    email: EmailStr
+    full_name: Optional[str] = None
+
+
+class AttendeeCreate(AttendeeBase):
+    pass
+
+
+class Attendee(AttendeeBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class AttendeeDetail(BaseModel):
+    attendee_id: int
+    full_name: Optional[str]
+    email: EmailStr
+    cohort: dict
+    progress: dict
+    intros: List[dict]
+
+
+class IntroQuestionBase(BaseModel):
+    prompt: Optional[str] = None
+    display_order: Optional[int] = None
+    required: Optional[bool] = None
+    active: Optional[bool] = None
+
+
+class IntroQuestionCreate(IntroQuestionBase):
+    code: str
+    prompt: str
+    display_order: int = 0
+    required: bool = True
+    active: bool = True
+
+
+class IntroQuestionUpdate(IntroQuestionBase):
+    code: Optional[str] = None
+
+
+class IntroReorderItem(BaseModel):
+    id: int
+    display_order: int
+
+
+class IntroReorderRequest(BaseModel):
+    items: List[IntroReorderItem]
+
+
+class IntroResponseUpdate(BaseModel):
+    response: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Onboarding Tasks
+# ---------------------------------------------------------------------------
+class TaskTemplateBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    instructions_url: Optional[str] = None
+    required: bool = True
+    display_order: int = 0
+
+
+class TaskTemplate(TaskTemplateBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class TaskTemplateCreate(TaskTemplateBase):
+    pass
+
+
+class CohortTaskTemplate(BaseModel):
+    id: int
+    cohort_id: int
+    template_id: int
+    display_order: int
+
+
+class AttendeeTask(BaseModel):
+    id: int
+    attendee_id: int
+    template_id: int
+    status: str
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class AttendeeTaskUpdate(BaseModel):
+    status: str = Field(..., pattern=r"^(PENDING|COMPLETED)$")
+    notes: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Surveys
+# ---------------------------------------------------------------------------
+class SurveyTemplate(BaseModel):
+    id: int
     name: str
-    tl1: str
-    tl2: str
-    tl3: str
-    image_filename: Optional[str]
+    slug: str
+    description: Optional[str] = None
+    active: bool = True
 
 
-# Autocomplete response
+class SurveyQuestion(BaseModel):
+    id: int
+    template_id: int
+    prompt: str
+    question_type: str
+    options: Optional[str] = None
+    display_order: int = 0
+    required: bool = True
+
+
+class SurveyQuestionCreate(BaseModel):
+    prompt: str
+    question_type: str
+    options: Optional[str] = None
+    display_order: int = 0
+    required: bool = True
+
+
+class SurveySubmission(BaseModel):
+    id: int
+    attendee_id: int
+    template_id: int
+    submitted_at: datetime
+
+
+class SurveyAnswer(BaseModel):
+    id: int
+    submission_id: int
+    question_id: int
+    response: Optional[str]
+
+
+# ---------------------------------------------------------------------------
+# Autocomplete/utility
+# ---------------------------------------------------------------------------
 class AutocompleteResponse(BaseModel):
     emails: List[str]

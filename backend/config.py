@@ -2,8 +2,16 @@
 Configuration settings for the workshop survey application using YAML.
 """
 import os
-from envyaml import EnvYAML
 from typing import Optional
+
+from envyaml import EnvYAML
+
+try:  # Ensure .env values populate os.environ before YAML is parsed
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    pass
 
 
 class Config:
@@ -20,10 +28,6 @@ class Config:
                     'user': os.getenv('ORACLE_USER', ''),
                     'password': os.getenv('ORACLE_PASSWORD', ''),
                     'dsn': os.getenv('ORACLE_DSN', ''),
-                },
-                'openai': {
-                    'api_key': os.getenv('OPENAI_API_KEY', ''),
-                    'base_url': os.getenv('OPENAI_BASE_URL'),
                 },
                 'app': {
                     'debug': os.getenv('DEBUG', 'false').lower() == 'true',
@@ -56,14 +60,6 @@ class Config:
         return self._config.get('database', {}).get('select_ai_profile', 'oci_ai_profile')
 
     @property
-    def openai_api_key(self) -> str:
-        return self._config.get('openai', {}).get('api_key', '')
-
-    @property
-    def openai_base_url(self) -> Optional[str]:
-        return self._config.get('openai', {}).get('base_url')
-
-    @property
     def debug(self) -> bool:
         return self._config.get('app', {}).get('debug', False)
 
@@ -73,15 +69,16 @@ class Config:
 
     @property
     def proxy_enabled(self) -> bool:
-        return self._config.get('proxy', {}).get('enabled', False)
+        value = self._config.get('proxy', {}).get('enabled', os.getenv('PROXY_ENABLED', 'false'))
+        return str(value).lower() == 'true'
 
     @property
     def proxy_prefix(self) -> str:
-        return self._config.get('proxy', {}).get('prefix', '')
+        return self._config.get('proxy', {}).get('prefix', os.getenv('PROXY_PREFIX', ''))
 
     @property
     def proxy_bearer_token(self) -> str:
-        return self._config.get('proxy', {}).get('bearer_token', '')
+        return self._config.get('proxy', {}).get('bearer_token', os.getenv('PROXY_BEARER_TOKEN', ''))
 
     @property
     def static_dir(self) -> str:
@@ -90,6 +87,32 @@ class Config:
     @property
     def images_dir(self) -> str:
         return os.path.join(self.static_dir, "images")
+
+    @property
+    def admin_shared_password(self) -> str:
+        return self._config.get('admin', {}).get('shared_password', os.getenv('ADMIN_SHARED_PASSWORD', 'change-me'))
+
+    @property
+    def ignore_test_users(self) -> bool:
+        value = self._config.get('admin', {}).get('ignore_test_users', os.getenv('IGNORE_TEST_USERS', 'true'))
+        return str(value).lower() != 'false'
+
+    @property
+    def reset_schema_on_startup(self) -> bool:
+        value = self._config.get('app', {}).get('reset_schema_on_startup', os.getenv('RESET_SCHEMA_ON_STARTUP', 'false'))
+        if isinstance(value, str) and ':' in value:
+            # Handle EnvYAML default syntax like "True:false"
+            value = value.split(':', 1)[0]
+        return str(value).lower() == 'true'
+
+    @property
+    def proxy_enabled(self) -> bool:
+        value = self._config.get('proxy', {}).get('enabled', os.getenv('PROXY_ENABLED', 'false'))
+        return str(value).lower() == 'true'
+
+    @property
+    def proxy_prefix(self) -> str:
+        return self._config.get('proxy', {}).get('prefix', os.getenv('PROXY_PREFIX', ''))
 
 
 # Global config instance

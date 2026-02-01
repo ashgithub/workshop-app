@@ -1,11 +1,12 @@
 """
-Main FastAPI application for Workshop Survey system.
+Main FastAPI application for AI Workshop Companion system.
 """
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -17,57 +18,29 @@ sys.path.insert(0, str(parent_dir))
 from backend.config import config
 from backend.database import db
 
-try:
-    from backend.routers.auth import router as auth_router
-    print("Auth router imported successfully")
-except ImportError as e:
-    print(f"Failed to import auth router: {e}")
-    auth_router = None
-
-try:
-    from backend.routers.attendees import router as attendees_router
-    print("Attendees router imported successfully")
-except ImportError as e:
-    print(f"Failed to import attendees router: {e}")
-    attendees_router = None
-
-try:
-    from backend.routers.tasks import router as tasks_router
-    print("Tasks router imported successfully")
-except ImportError as e:
-    print(f"Failed to import tasks router: {e}")
-    tasks_router = None
-
-try:
-    from backend.routers.surveys import router as surveys_router
-    print("Surveys router imported successfully")
-except ImportError as e:
-    print(f"Failed to import surveys router: {e}")
-    surveys_router = None
-
-try:
-    from backend.routers.admin import router as admin_router
-    print("Admin router imported successfully")
-except ImportError as e:
-    print(f"Failed to import admin router: {e}")
-    admin_router = None
+from backend.routers import auth as auth_router_module
+from backend.routers.v2 import attendees as attendees_router_module
+from backend.routers.v2 import cohorts as cohorts_router_module
+from backend.routers.v2 import intros as intros_router_module
+from backend.routers.v2 import surveys as surveys_router_module
+from backend.routers.v2 import tasks as tasks_router_module
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
     # Startup
-    print("Starting Workshop Survey API...")
+    print("Starting AI Workshop Companion API...")
 
     # Test database connection
     if db.test_connection():
         print("Database connection successful")
 
-        # Initialize database schema if needed
-        if db.initialize_schema():
-            print("Database schema initialized successfully")
-        else:
-            print("Warning: Database schema initialization failed - some features may not work")
+        if config.reset_schema_on_startup:
+            if db.initialize_schema():
+                print("Database schema initialized successfully")
+            else:
+                print("Warning: Database schema initialization failed - some features may not work")
     else:
         print("Warning: Database connection failed - some features may not work")
 
@@ -76,12 +49,12 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    print("Shutting down Workshop Survey API...")
+    print("Shutting down AI Workshop Companion API...")
 
 
 # Create FastAPI app with conditional root_path for proxy support
 app = FastAPI(
-    title="Workshop Survey API",
+    title="AI Workshop Companion API",
     description="API for workshop attendee management system",
     version="1.0.0",
     debug=config.debug,
@@ -109,37 +82,18 @@ async def health_check():
         "version": "1.0.0"
     }
 
+@app.get("/", include_in_schema=False)
+async def serve_root():
+    return RedirectResponse(url="index.html")
+
 
 # Include routers
-if auth_router:
-    app.include_router(auth_router, prefix="/api", tags=["authentication"])
-    print("Auth router registered successfully")
-else:
-    print("Auth router not available")
-
-if attendees_router:
-    app.include_router(attendees_router, prefix="/api/attendees", tags=["attendees"])
-    print("Attendees router registered successfully")
-else:
-    print("Attendees router not available")
-
-if tasks_router:
-    app.include_router(tasks_router, prefix="/api/tasks", tags=["tasks"])
-    print("Tasks router registered successfully")
-else:
-    print("Tasks router not available")
-
-if surveys_router:
-    app.include_router(surveys_router, prefix="/api/surveys", tags=["surveys"])
-    print("Surveys router registered successfully")
-else:
-    print("Surveys router not available")
-
-if admin_router:
-    app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
-    print("Admin router registered successfully")
-else:
-    print("Admin router not available")
+app.include_router(auth_router_module.router, prefix="/api", tags=["authentication"])
+app.include_router(attendees_router_module.router, prefix="/api")
+app.include_router(cohorts_router_module.router, prefix="/api")
+app.include_router(intros_router_module.router, prefix="/api")
+app.include_router(tasks_router_module.router, prefix="/api")
+app.include_router(surveys_router_module.router, prefix="/api")
 
 
 # Mount static files (after API routes to avoid conflicts)
@@ -150,8 +104,6 @@ app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
 # Mount frontend files (must be last) with conditional config injection
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
-    from fastapi.responses import HTMLResponse
-
     # Custom static files handler to inject proxy config
     class ConfigInjectingStaticFiles(StaticFiles):
         async def get_response(self, path: str, scope):

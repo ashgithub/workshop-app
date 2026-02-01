@@ -3,23 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workshop Survey - Login</title>
+    <title>AI Workshop Companion — Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-    <div class="container">
-        <div class="login-section">
-            <h1>Workshop Survey System</h1>
-            <div class="login-form">
-                <label for="email">Email Address:</label>
-                <input type="email" id="email" placeholder="Enter your email" autocomplete="off">
-                <button id="login-btn" class="btn-primary">Login</button>
-                <button id="admin-btn" class="btn-secondary">Admin Access</button>
+<body class="login-body">
+    <main class="login-shell">
+        <section class="login-card" aria-labelledby="login-title">
+            <header class="login-header">
+                <div>
+                    <p class="login-eyebrow">AI Workshop Companion</p>
+                    <h1 id="login-title">Sign in to continue</h1>
+                    <p class="login-subtitle">Track attendee progress or submit your onboarding tasks.</p>
+                </div>
+            </header>
+
+            <form class="login-form" onsubmit="return false;" novalidate>
+                <label for="email" class="login-label">Email address</label>
+                <div class="login-input-group">
+                    <input type="email"
+                           id="email"
+                           class="login-input"
+                           name="email"
+                           placeholder="you@example.com"
+                           autocomplete="email"
+                           required>
+                    <div id="autocomplete-results" class="login-autocomplete" role="listbox"></div>
+                </div>
+
+                <div class="login-actions">
+                    <button id="login-btn" class="btn-primary login-primary" type="button">Continue</button>
+                    <button id="admin-btn" class="btn-ghost" type="button">Admin access</button>
+                </div>
+            </form>
+
+            <div id="message" class="login-message message" role="status" aria-live="polite"></div>
+        </section>
+
+        <aside class="login-aside">
+            <div class="login-aside-content">
+                <h2>Welcome to MDC 2026</h2>
+                <p>Finish your onboarding checklist, keep travel details up to date, and share feedback throughout the workshop.</p>
+                <ul>
+                    <li>Personalized attendee portal</li>
+                    <li>Admin dashboard with cohort insights</li>
+                    <li>Secure Oracle-backed data</li>
+                </ul>
             </div>
-            <div id="autocomplete-results" class="autocomplete-results"></div>
-            <div id="message" class="message"></div>
-        </div>
-    </div>
+        </aside>
+        <footer class="login-footer">
+            <p>Need help? Reach us in <strong>#inno-mdc-ai-workshop</strong>.</p>
+        </footer>
+    </main>
+
     <script src="js/login.js"></script>
 </body>
 </html>

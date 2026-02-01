@@ -1,4 +1,4 @@
-# Workshop Survey System
+# AI Workshop Companion
 
 A comprehensive workshop attendee management system with attendee progress tracking, survey collection, and admin dashboard with natural language querying capabilities.
 
@@ -39,7 +39,7 @@ Update `config.yaml` with your database settings.
 
 4. **Run the application:**
 ```bash
-python backend/main.py
+uvicorn backend.main:app --reload
 ```
 
 The application will be available at `http://localhost:8000`
@@ -48,21 +48,14 @@ The application will be available at `http://localhost:8000`
 
 ```
 workshop-survey/
-├── backend/                    # FastAPI backend
-│   ├── main.py                # FastAPI application
-│   ├── config.py              # Configuration management
-│   ├── database.py            # Oracle connection management
-│   ├── schemas.py             # Pydantic models
-│   ├── crud.py                # Direct SQL operations
-│   ├── routers/               # API endpoints
-│   │   ├── auth.py           # Authentication
-│   │   ├── attendees.py      # Attendee management
-│   │   ├── tasks.py          # Task tracking
-│   │   ├── surveys.py        # Survey handling
-│   │   └── admin.py          # Admin features
-│   └── utils/                 # Utilities
-│       ├── nl_query.py       # NL to SQL logic
-│       └── progress.py       # Progress calculations
+├── backend/
+│   ├── main.py                # FastAPI application (uvicorn entrypoint)
+│   ├── config.py              # YAML/env configuration loader
+│   ├── database.py            # Oracle connection & schema helpers
+│   ├── routers/
+│   │   ├── auth.py            # Authentication endpoints
+│   │   └── v2/                # Cohorts, attendees, tasks, surveys
+│   └── services/              # Business logic for cohorts/surveys
 ├── frontend/                  # Static HTML/JS frontend
 │   ├── index.html            # Login page
 │   ├── attendee.html         # Attendee portal
@@ -74,39 +67,18 @@ workshop-survey/
 └── pyproject.toml            # Dependencies
 ```
 
-## Database Schema
+## Current Schema Overview
 
-The system uses three main tables:
+- **ADMIN_USERS**: Admin accounts with activation status
+- **COHORTS**: Workshop cohort metadata (code, title, location)
+- **ATTENDEES**: Participants linked to cohorts (`IS_TEST` marks seed data)
+- **ONBOARDING_TASK_TEMPLATES / COHORT_TASK_TEMPLATES**: Checklist definitions per cohort
+- **ATTENDEE_TASKS**: Per-attendee checklist assignments and status
+- **SURVEY_TEMPLATES / SURVEY_QUESTIONS**: Dynamic survey catalog
+- **SURVEY_SUBMISSIONS / SURVEY_ANSWERS**: Collected responses
+- **NL_QUERY_LOGS**: Audit trail for natural-language SQL queries
 
-- **STUDENTS**: Attendee information and progress
-- **ONBOARDING_TASKS**: Task completion tracking
-- **SURVEY_RESPONSES**: Survey and feedback data
-- **WORKSHOP_FEEDBACK**: Overall workshop feedback
-
-## API Endpoints
-
-### Authentication
-- `POST /api/login` - User authentication
-- `GET /api/attendees/autocomplete` - Email autocomplete
-
-### Attendee Management
-- `GET /api/attendees/{id}` - Get attendee details
-- `PUT /api/attendees/{id}` - Update attendee info
-- `GET /api/attendees/{id}/image` - Serve profile image
-
-### Task Management
-- `GET /api/tasks/{student_id}` - Get tasks
-- `POST /api/tasks/{student_id}` - Update task completion
-
-### Surveys
-- `POST /api/surveys` - Submit session surveys
-- `POST /api/surveys/overall` - Submit workshop feedback
-
-### Admin Features
-- `GET /api/admin/attendees` - List all attendees
-- `POST /api/admin/query` - Natural language queries
-- `GET /api/admin/game/next` - Get next game attendee
-- `PUT /api/admin/game/played` - Mark attendee as played
+Updated API routes live under `/api/...` with versioned routers in `backend/routers/v2/` (cohorts, attendees, tasks, surveys) plus authentication and NL query endpoints.
 
 ## Configuration
 
@@ -119,13 +91,15 @@ ORACLE_DSN=your_dsn
 ORACLE_WALLET=/path/to/wallet
 ORACLE_WALLET_PASS=wallet_password
 
-# OpenAI
-OPENAI_API_KEY=your_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-
 # Application
 DEBUG=true
 SECRET_KEY=your-secret-key
+ADMIN_SHARED_PASSWORD=change-me-admin
+
+# Reverse proxy
+PROXY_ENABLED=false
+PROXY_PREFIX=/workshop-app
+PROXY_BEARER_TOKEN=replace-with-proxy-token
 ```
 
 ### YAML Configuration (config.yaml)
@@ -137,10 +111,6 @@ database:
   wallet: $ORACLE_WALLET
   wallet_pass: $ORACLE_WALLET_PASS
 
-openai:
-  api_key: $OPENAI_API_KEY
-  base_url: $OPENAI_BASE_URL
-
 app:
   debug: $DEBUG
   secret_key: $SECRET_KEY
@@ -149,10 +119,10 @@ app:
 ## Development
 
 ### Running in Development Mode
+Use uvicorn so the FastAPI app stays responsive:
 ```bash
-python backend/main.py
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
-The server will auto-reload on code changes.
 
 ### Testing Database Connection
 ```bash
@@ -160,9 +130,7 @@ curl http://localhost:8000/api/health
 ```
 
 ### Building for Production
-```bash
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
-```
+Run uvicorn/gunicorn pointing at `backend.main:app`; ensure `RESET_SCHEMA_ON_STARTUP` stays `false` so Oracle data persists.
 
 ## Contributing
 

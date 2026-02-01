@@ -109,6 +109,15 @@ document.addEventListener('DOMContentLoaded', function() {
             loginBtn.disabled = true;
             adminBtn.disabled = true;
 
+            let adminPassword = null;
+            if (isAdmin) {
+                adminPassword = prompt('Enter admin password');
+                if (!adminPassword) {
+                    showMessage('Admin password is required', 'error');
+                    return;
+                }
+            }
+
             const response = await fetch('api/login', {
                 method: 'POST',
                 headers: {
@@ -116,16 +125,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     email: email,
-                    is_admin: isAdmin
+                    is_admin: isAdmin,
+                    admin_password: adminPassword
                 })
             });
 
-            const data = await response.json();
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                // Non-JSON response fallback
+            }
 
             if (response.ok) {
                 // Store session info (in a real app, use proper session management)
-                localStorage.setItem('student_id', data.student_id);
+                localStorage.setItem('user_id', data.user_id);
                 localStorage.setItem('is_admin', data.is_admin);
+                if (data.cohort_id) {
+                    localStorage.setItem('cohort_id', data.cohort_id);
+                }
 
                 // Redirect based on user type
                 if (data.is_admin) {
@@ -134,7 +152,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = 'attendee.html';
                 }
             } else {
-                showMessage(data.detail || 'Login failed', 'error');
+                const details = extractErrorMessage(data);
+                const defaultText = response.status === 422
+                    ? 'Please enter a valid email address.'
+                    : (response.statusText || 'Login failed');
+                showMessage(details || defaultText, 'error');
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -143,6 +165,42 @@ document.addEventListener('DOMContentLoaded', function() {
             loginBtn.disabled = false;
             adminBtn.disabled = false;
         }
+    }
+
+    function extractErrorMessage(payload) {
+        if (!payload) {
+            return '';
+        }
+
+        if (typeof payload === 'string') {
+            return payload;
+        }
+
+        if (Array.isArray(payload.detail)) {
+            const first = payload.detail[0];
+            if (first && typeof first === 'object') {
+                if (first.msg) {
+                    return first.msg;
+                }
+                if (first.detail) {
+                    return first.detail;
+                }
+            }
+            return payload.detail.map(item => item.msg || item.detail || '').filter(Boolean).join(', ');
+        }
+
+        if (typeof payload.detail === 'string') {
+            return payload.detail;
+        }
+
+        if (payload.detail && typeof payload.detail === 'object') {
+            const nested = extractErrorMessage(payload.detail);
+            if (nested) {
+                return nested;
+            }
+        }
+
+        return '';
     }
 
     function showMessage(text, type) {
