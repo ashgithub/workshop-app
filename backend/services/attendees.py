@@ -13,7 +13,7 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
         """
         SELECT a.ID, a.EMAIL, a.FULL_NAME, a.PROFILE_IMAGE, a.ACKNOWLEDGED,
                c.ID, c.TITLE, c.LOCATION_NAME, c.ADDRESS, c.ROOM, c.START_DATE, c.END_DATE,
-               c.START_TIME, c.END_TIME
+               c.START_TIME, c.END_TIME, c.AGENDA_URL
         FROM ATTENDEES a
         JOIN COHORTS c ON c.ID = a.COHORT_ID
         WHERE a.ID = :attendee_id
@@ -39,6 +39,7 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
             "end_date": row[11].isoformat() if row[11] else None,
             "start_time": row[12].isoformat() if row[12] else None,
             "end_time": row[13].isoformat() if row[13] else None,
+            "agenda_url": row[14],
         },
     }
 
