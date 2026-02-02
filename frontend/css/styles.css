@@ -2,8 +2,8 @@
 body.login-body {
     margin: 0;
     min-height: 100vh;
-    background: radial-gradient(circle at 10% 20%, rgba(232, 237, 255, 0.8) 0%, rgba(245, 248, 255, 0.9) 45%, rgba(255, 255, 255, 1) 100%);
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--rw-background);
+    font-family: var(--rw-font);
 }
 
 .login-shell {
@@ -86,8 +86,8 @@ body.login-body {
 
 .login-input:focus {
     outline: none;
-    border-color: #3b5bdb;
-    box-shadow: 0 0 0 4px rgba(59, 91, 219, 0.12);
+    border-color: var(--rw-accent);
+    box-shadow: 0 0 0 4px rgba(199, 70, 52, 0.12);
 }
 
 .login-actions {
@@ -626,7 +626,7 @@ footer.site-footer {
     height: 120px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #667eea;
+    border: 4px solid var(--rw-accent);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -790,7 +790,7 @@ footer.site-footer {
 }
 
 .query-form input:focus {
-    border-color: #667eea;
+    border-color: var(--rw-accent);
     outline: none;
 }
 
@@ -840,7 +840,7 @@ footer.site-footer {
 .form-group input[type="email"]:focus,
 .form-group textarea:focus,
 .form-group select:focus {
-    border-color: #667eea;
+    border-color: var(--rw-accent);
     outline: none;
 }
 
@@ -1068,7 +1068,7 @@ h3.completed {
 
 .survey-tab-btn.active {
     background: white;
-    border-bottom-color: #667eea;
+    border-bottom-color: var(--rw-accent);
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -1089,7 +1089,7 @@ h3.completed {
 }
 
 .survey-tab-btn.active .tab-name {
-    color: #667eea;
+    color: var(--rw-accent);
     font-weight: 600;
 }
 
@@ -1139,14 +1139,14 @@ h3.completed {
 }
 
 .emoji-btn:hover {
-    border-color: #667eea;
+    border-color: var(--rw-accent);
     transform: scale(1.05);
 }
 
 .emoji-btn.selected {
-    border-color: #667eea;
-    background: #eff6ff;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    border-color: var(--rw-accent);
+    background: rgba(199, 70, 52, 0.1);
+    box-shadow: 0 0 0 2px rgba(199, 70, 52, 0.2);
 }
 
 .selected-rating {
@@ -1245,7 +1245,7 @@ h3.completed {
     }
 
     .tab-btn.active {
-        border-left-color: #667eea;
+        border-left-color: var(--rw-accent);
         border-bottom-color: transparent;
     }
 

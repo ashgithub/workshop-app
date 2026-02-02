@@ -402,17 +402,30 @@ async function loadSurveys(attendeeId) {
             throw new Error(await response.text());
         }
         const templates = await response.json();
-       const cards = await Promise.all(
-           templates.map(async template => {
-               const submission = await fetchSurveySubmission(attendeeId, template.id);
-               return renderSurveyCard(template, submission);
-           })
-       );
-       document.getElementById('survey-grid').innerHTML = cards.join('');
-        initSurveyButtons(attendeeId);
+
+        // Load all submissions in parallel
+        const submissions = await Promise.all(
+            templates.map(template => fetchSurveySubmission(attendeeId, template.id))
+        );
+
+        // Count completed surveys
+        const completed = submissions.filter(submission => submission !== null).length;
+        const total = templates.length;
+
+        // Update progress pill
+        const pill = document.getElementById('surveys-progress-pill');
+        if (pill) {
+            pill.textContent = `${completed} of ${total} completed`;
+        }
+
+        // Render survey tabs
+        renderSurveyTabs(templates, submissions, attendeeId);
     } catch (error) {
         console.error('Failed to load surveys', error);
-        document.getElementById('survey-grid').innerHTML = '<p>Surveys will appear here closer to the workshop.</p>';
+        const container = document.getElementById('survey-tabs');
+        if (container) {
+            container.innerHTML = '<p>Surveys will appear here closer to the workshop.</p>';
+        }
     }
 }
 
@@ -428,34 +441,449 @@ async function fetchSurveySubmission(attendeeId, templateId) {
     return null;
 }
 
-function renderSurveyCard(template, submission) {
-    const completed = Boolean(submission);
-    const badge = completed
-        ? '<span class="badge complete">Complete</span>'
-        : '<span class="badge pending">Pending</span>';
+function renderSurveyTabs(templates, submissions, attendeeId) {
+    const tabButtons = document.getElementById('survey-tab-buttons');
+    const tabContent = document.getElementById('survey-tab-content');
+
+    if (!tabButtons || !tabContent) return;
+
+    // Create tab buttons
+    const buttonsHtml = templates.map((template, index) => {
+        const submission = submissions[index];
+        const completed = Boolean(submission);
+        const isActive = index === 0;
+
+        return `
+            <button class="survey-tab-btn ${completed ? 'completed' : ''} ${isActive ? 'active' : ''}" data-tab="${template.id}">
+                <span class="tab-name">${template.name}</span>
+                <span class="pill ${completed ? 'pill-complete' : 'pill-pending'}">${completed ? 'Complete' : 'Pending'}</span>
+            </button>
+        `;
+    }).join('');
+
+    tabButtons.innerHTML = buttonsHtml;
+
+    // Create tab content
+    const contentHtml = templates.map((template, index) => {
+        const submission = submissions[index];
+        const isActive = index === 0;
+        return renderSurveyTabContent(template, submission, attendeeId, isActive);
+    }).join('');
+
+    tabContent.innerHTML = contentHtml;
+
+    // Add tab switching functionality
+    tabButtons.querySelectorAll('.survey-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from all buttons and content
+            tabButtons.querySelectorAll('.survey-tab-btn').forEach(b => b.classList.remove('active'));
+            tabContent.querySelectorAll('.survey-tab-content').forEach(c => c.classList.remove('active'));
+
+            // Add active class to clicked button and corresponding content
+            btn.classList.add('active');
+            const templateId = btn.getAttribute('data-tab');
+            const contentDiv = tabContent.querySelector(`[data-content="${templateId}"]`);
+            if (contentDiv) {
+                contentDiv.classList.add('active');
+            }
+        });
+    });
+
+    // Initialize rating functionality for all tabs
+    initSurveyRatings(attendeeId);
+}
+
+function renderSurveyTabContent(template, submission, attendeeId, isActive) {
+    // Create answers map from submission
+    const answers = {};
+    if (submission && submission.answers) {
+        submission.answers.forEach(answer => {
+            // For simplicity, we'll map the first rating answer and first text answer
+            if (!answers.rating && answer.response && /^\d+$/.test(answer.response)) {
+                answers.rating = parseInt(answer.response);
+            } else if (!answers.whatLiked && answer.response && answer.response.length > 0) {
+                answers.whatLiked = answer.response;
+            } else if (!answers.whatBetter && answer.response && answer.response.length > 0) {
+                answers.whatBetter = answer.response;
+            }
+        });
+    }
 
     return `
-        <div class="survey-card">
-            <div class="survey-card-header">
-                <h4>${template.name}</h4>
-                ${badge}
+        <div class="survey-tab-content ${isActive ? 'active' : ''}" data-content="${template.id}">
+            <div class="survey-form">
+                <h3>${template.name}</h3>
+                <p class="survey-description">${template.description || 'Share your feedback to help us improve.'}</p>
+
+                <div class="rating-section">
+                    <label>How would you rate this session?</label>
+                    <div class="emoji-rating" id="rating-${template.id}" data-selected-rating="${answers.rating || ''}">
+                        <button class="emoji-btn ${answers.rating === 1 ? 'selected' : ''}" data-rating="1" title="Poor">😞</button>
+                        <button class="emoji-btn ${answers.rating === 2 ? 'selected' : ''}" data-rating="2" title="Below Average">🙁</button>
+                        <button class="emoji-btn ${answers.rating === 3 ? 'selected' : ''}" data-rating="3" title="Average">😐</button>
+                        <button class="emoji-btn ${answers.rating === 4 ? 'selected' : ''}" data-rating="4" title="Good">🙂</button>
+                        <button class="emoji-btn ${answers.rating === 5 ? 'selected' : ''}" data-rating="5" title="Excellent">😊</button>
+                    </div>
+                    <div class="selected-rating" id="selected-${template.id}">${answers.rating ? `Selected: ${['😞', '🙁', '😐', '🙂', '😊'][answers.rating - 1]} (${answers.rating}/5)` : ''}</div>
+                </div>
+
+                <div class="form-group">
+                    <label>What did you like about this session?</label>
+                    <textarea id="liked-${template.id}" rows="3" placeholder="Share what worked well...">${answers.whatLiked || ''}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>What could be improved?</label>
+                    <textarea id="better-${template.id}" rows="3" placeholder="Suggestions for improvement...">${answers.whatBetter || ''}</textarea>
+                </div>
+
+                <button class="btn-primary submit-survey-btn" data-template="${template.id}" data-attendee="${attendeeId}">Submit Feedback</button>
             </div>
-            <p>${template.description || 'Share your feedback to help us improve.'}</p>
-            <button class="btn-secondary" data-survey="${template.id}">
-                ${completed ? 'Review responses' : 'Start survey'}
-            </button>
         </div>
     `;
 }
 
-function showSurveyUnavailable() {
-    alert('Survey flow will open closer to the workshop date.');
+function showSurvey(attendeeId, templateId) {
+    // Create modal for survey
+    const modal = document.createElement('div');
+    modal.className = 'modal survey-modal';
+    modal.innerHTML = `
+        <div class="modal-content survey-modal-content">
+            <span class="close">&times;</span>
+            <div id="survey-content">
+                <div class="survey-loading">Loading survey...</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Show modal
+    modal.style.display = 'block';
+
+    // Load survey content
+    loadSurveyContent(attendeeId, templateId);
+
+    // Close handlers
+    const closeBtn = modal.querySelector('.close');
+    closeBtn.onclick = () => {
+        modal.remove();
+    };
+
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+async function loadSurveyContent(attendeeId, templateId) {
+    try {
+        // Load template info and questions
+        const templateResponse = await apiFetch(`/api/surveys/templates/${templateId}`);
+        if (!templateResponse.ok) {
+            throw new Error('Failed to load survey template');
+        }
+        const template = await templateResponse.json();
+
+        // Load existing submission if any
+        const submission = await fetchSurveySubmission(attendeeId, templateId);
+
+        // Load questions
+        const questionsResponse = await apiFetch(`/api/surveys/templates/${templateId}/questions`);
+        if (!questionsResponse.ok) {
+            throw new Error('Failed to load survey questions');
+        }
+        const questions = await questionsResponse.json();
+
+        renderSurveyForm(attendeeId, template, questions, submission);
+    } catch (error) {
+        console.error('Failed to load survey', error);
+        document.getElementById('survey-content').innerHTML = '<p>Unable to load survey. Please try again.</p>';
+    }
+}
+
+function renderSurveyForm(attendeeId, template, questions, submission) {
+    const container = document.getElementById('survey-content');
+
+    // Create answers map from submission
+    const answers = {};
+    if (submission && submission.answers) {
+        submission.answers.forEach(answer => {
+            answers[answer.question_id] = answer.response;
+        });
+    }
+
+    let html = `
+        <div class="survey-header">
+            <h2>${template.name}</h2>
+            <p class="survey-description">${template.description || ''}</p>
+        </div>
+        <div class="survey-progress">
+            <div class="progress-pill" id="survey-progress-pill">0 of ${questions.length} answered</div>
+        </div>
+        <form class="survey-form" id="survey-form">
+    `;
+
+    questions.forEach((question, index) => {
+        const answered = answers[question.id] && answers[question.id].trim();
+        const renderer = getSurveyRenderer(question);
+        const statusClass = answered ? 'complete' : 'pending';
+
+        html += `
+            <div class="field-group ${answered ? 'completed' : ''}" data-question-group="${question.id}">
+                <div class="field-header">
+                    <div class="field-title">${index + 1}. ${question.prompt}</div>
+                    <div class="field-status ${statusClass}">
+                        <span class="status-icon">${answered ? '✓' : '○'}</span>
+                        ${answered ? 'Complete' : 'Pending'}
+                    </div>
+                </div>
+                <div class="intro-input">
+                    ${renderer(question, answers[question.id] || '')}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+            <div class="survey-actions">
+                <button type="submit" class="btn-primary">Submit Survey</button>
+            </div>
+        </form>
+    `;
+
+    container.innerHTML = html;
+
+    // Update progress
+    updateSurveyProgress();
+
+    // Add form submission handler
+    const form = document.getElementById('survey-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await submitSurvey(attendeeId, template.id, questions);
+    });
+
+    // Add change listeners for auto-save
+    container.querySelectorAll('[data-question]').forEach(input => {
+        input.addEventListener('change', () => {
+            updateSurveyProgress();
+        });
+    });
+}
+
+function updateSurveyProgress() {
+    const questions = document.querySelectorAll('.field-group[data-question-group]');
+    const answered = Array.from(questions).filter(q => {
+        const inputs = q.querySelectorAll('[data-question]');
+        return Array.from(inputs).some(input => {
+            if (input.type === 'radio' || input.type === 'checkbox') {
+                return input.checked;
+            }
+            return input.value && input.value.trim();
+        });
+    }).length;
+
+    const pill = document.getElementById('survey-progress-pill');
+    if (pill) {
+        pill.textContent = `${answered} of ${questions.length} answered`;
+    }
+}
+
+async function submitSurvey(attendeeId, templateId, questions) {
+    try {
+        const answers = [];
+
+        for (const question of questions) {
+            const container = document.querySelector(`[data-question-group="${question.id}"]`);
+            if (!container) continue;
+
+            const response = getSurveyInputValue(question, container);
+            if (response) {
+                answers.push({
+                    question_id: question.id,
+                    response: response
+                });
+            }
+        }
+
+        const response = await apiFetch(`/api/surveys/submissions/${attendeeId}/${templateId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to submit survey');
+        }
+
+        showSuccess('Survey submitted successfully!');
+        // Close modal and refresh surveys
+        document.querySelector('.survey-modal').remove();
+        loadAttendee(attendeeId);
+    } catch (error) {
+        console.error('Failed to submit survey', error);
+        showMessage('Failed to submit survey. Please try again.', 'error');
+    }
+}
+
+const surveyRenderers = {
+    text: (question, value = '') =>
+        `<input type="text" data-question="${question.id}" value="${value}" placeholder="Enter your response..." class="survey-input">`,
+
+    textarea: (question, value = '') =>
+        `<textarea data-question="${question.id}" placeholder="Enter your response..." class="survey-textarea">${value}</textarea>`,
+
+    choice: (question, value = '') => {
+        const options = question.options ? JSON.parse(question.options).options || [] : [];
+        return `
+            <div class="choice-group" role="radiogroup" aria-label="${question.prompt}">
+                ${options.map(option => {
+                    const checked = option.value === value ? 'checked' : '';
+                    return `
+                        <label class="choice-option">
+                            <input type="radio" name="survey-choice-${question.id}" value="${option.value}" data-question="${question.id}" ${checked}>
+                            <span>${option.label}</span>
+                        </label>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    },
+};
+
+function getSurveyRenderer(question) {
+    const type = question.question_type || 'text';
+    return surveyRenderers[type] || surveyRenderers.text;
+}
+
+function getSurveyInputValue(question, container) {
+    const type = question.question_type || 'text';
+    if (type === 'choice') {
+        const checked = container.querySelector(`input[data-question="${question.id}"]:checked`);
+        return checked?.value || '';
+    }
+    const field = container.querySelector(`[data-question="${question.id}"]`);
+    return field?.value || '';
 }
 
 function initSurveyButtons(attendeeId) {
     document.querySelectorAll('[data-survey]').forEach(btn => {
-        btn.addEventListener('click', () => showSurveyUnavailable());
+        btn.addEventListener('click', () => {
+            const templateId = btn.getAttribute('data-survey');
+            showSurvey(attendeeId, templateId);
+        });
     });
+}
+
+function initSurveyRatings(attendeeId) {
+    // Add rating button functionality
+    document.querySelectorAll('.emoji-rating').forEach(rating => {
+        const buttons = rating.querySelectorAll('.emoji-btn');
+        const templateId = rating.id.replace('rating-', '');
+        const selectedDiv = document.getElementById(`selected-${templateId}`);
+
+        buttons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove selected class from all buttons in this rating
+                buttons.forEach(btn => btn.classList.remove('selected'));
+                // Add selected class to clicked button
+                this.classList.add('selected');
+
+                const ratingValue = this.getAttribute('data-rating');
+                const emoji = this.textContent;
+                if (selectedDiv) {
+                    selectedDiv.textContent = `Selected: ${emoji} (${ratingValue}/5)`;
+                }
+
+                // Store the rating value
+                rating.setAttribute('data-selected-rating', ratingValue);
+            });
+        });
+    });
+
+    // Add submit button functionality
+    document.querySelectorAll('.submit-survey-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const templateId = btn.getAttribute('data-template');
+            const attendeeIdFromBtn = btn.getAttribute('data-attendee');
+            await submitSimpleSurvey(attendeeIdFromBtn, templateId);
+        });
+    });
+}
+
+async function submitSimpleSurvey(attendeeId, templateId) {
+    try {
+        const rating = document.getElementById(`rating-${templateId}`)?.getAttribute('data-selected-rating');
+        const whatLiked = document.getElementById(`liked-${templateId}`)?.value.trim() || '';
+        const whatBetter = document.getElementById(`better-${templateId}`)?.value.trim() || '';
+
+        if (!rating) {
+            showMessage('Please select a rating before submitting.', 'error');
+            return;
+        }
+
+        // Fetch questions to get actual question IDs
+        const questionsResponse = await apiFetch(`/api/surveys/templates/${templateId}/questions`);
+        if (!questionsResponse.ok) {
+            throw new Error('Failed to load survey questions');
+        }
+        const questions = await questionsResponse.json();
+
+        // Create answers using actual question IDs
+        const answers = [];
+
+        // First question gets the rating
+        if (questions.length > 0) {
+            answers.push({
+                question_id: questions[0].id,
+                response: rating
+            });
+        }
+
+        // Second question gets "what liked"
+        if (questions.length > 1 && whatLiked) {
+            answers.push({
+                question_id: questions[1].id,
+                response: whatLiked
+            });
+        }
+
+        // Third question gets "what could be improved"
+        if (questions.length > 2 && whatBetter) {
+            answers.push({
+                question_id: questions[2].id,
+                response: whatBetter
+            });
+        }
+
+        const response = await apiFetch(`/api/surveys/submissions/${attendeeId}/${templateId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to submit survey');
+        }
+
+        showSuccess('Survey submitted successfully!');
+        // Update tab status
+        const tabBtn = document.querySelector(`.survey-tab-btn[data-tab="${templateId}"]`);
+        if (tabBtn) {
+            tabBtn.classList.add('completed');
+            const pill = tabBtn.querySelector('.pill');
+            if (pill) {
+                pill.className = 'pill pill-complete';
+                pill.textContent = 'Complete';
+            }
+        }
+        // Refresh progress
+        loadAttendee(attendeeId);
+    } catch (error) {
+        console.error('Failed to submit survey', error);
+        showMessage('Failed to submit survey. Please try again.', 'error');
+    }
 }
 
 function showSuccess(text) {

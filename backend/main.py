@@ -49,13 +49,7 @@ async def lifespan(app: FastAPI):
             else:
                 print("Database data reset failed - exiting")
                 sys.exit(1)
-        else:
-            # Always seed defaults even without schema reset
-            try:
-                db.seed_defaults()
-                print("Database defaults seeded successfully")
-            except Exception as exc:
-                print(f"Warning: Failed to seed database defaults: {exc}")
+        # Note: No automatic seeding on startup - use RESET_DATA_ON_STARTUP=true for data setup
     else:
         print("Warning: Database connection failed - some features may not work")
 

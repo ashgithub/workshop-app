@@ -11,25 +11,40 @@
    - Migrated admin dashboard from legacy STUDENTS table to ATTENDEES table
    - Removed legacy task system (ONBOARDING_TASK_TEMPLATES, COHORT_TASK_TEMPLATES, ATTENDEE_TASKS tables)
 
+2. **Surveys Implementation** ✅
+   - Created 7 comprehensive survey templates: Onboarding (pre-workshop), Day 1-5 (daily feedback), Overall (post-workshop)
+   - Updated database seeding in `backend/database.py` to create survey templates and 30+ questions
+   - Implemented modal-based survey forms with progress tracking ("X of Y answered")
+   - Added survey progress counter to main dashboard ("X of 7 completed")
+   - Standardized survey UI to match intro/onboarding styling with field groups and completion status
+   - Integrated survey submissions with existing `SURVEY_TEMPLATES`, `SURVEY_QUESTIONS`, `SURVEY_SUBMISSIONS`, `SURVEY_ANSWERS` tables
+   - Added responsive design and accessibility features for survey forms
+
+3. **Theming Standardization** ✅
+   - Unified color palette across all pages (replaced #667eea blue with --rw-accent red)
+   - Standardized backgrounds (login/attendee pages now use consistent --rw-background)
+   - Unified fonts (--rw-font) and typography across login, attendee, and admin pages
+   - Consistent progress indicators, focus states, and interactive elements
+   - Applied Oracle Redwood-inspired design theme consistently throughout
+
 ## Pending Enhancements
 1. **Admin Dashboard Expansion**
    - Restore editing for intro/onboarding/survey questions (CRUD UI in admin.js/html, tied to backend routers/services).
    - Implement bulk attendee operations and CSV export.
+   - Add survey management interface (create/edit/delete survey templates and questions).
    - Game functionality removed (was dependent on legacy STUDENTS table).
 
-2. **Surveys Implementation**
-   - Create and seed surveys as templates: Onboarding Survey (pre-workshop), Daily Modules (one per day, e.g., "Day 1 Feedback"), Overall Survey (post-workshop) in backend/surveys.py; use DAY field or CONFIG for structure (adapt old module-based templates).
-   - Fix rendering/formatting UX in surveys tab (apply larger boxes/CSS consistency from intros tab; ensure surveys show by type/module in attendee surveys tab).
-
-3. **UI/UX Improvements**
+2. **UI/UX Improvements**
    - Move acknowledgment checkbox to user panel (more prominent placement)
    - Add descriptive tasks/examples for introduction questions (what to include in intro text)
    - Include links to details for intro & onboarding (link to canvas in slack)
+   - agenda button 
 
-4. **Full Testing & Polish**
-   - Test admin editing on seeded data (onboarding/overall/daily surveys); verify mobile responsiveness.
-   - Run full migrations/tests with updated onboarding system.
-   - Audit backend APIs for question editing support (e.g., /api/intros/admin, /api/onboarding/admin, /api/surveys/modules).
+3. **Full Testing & Polish**
+   - Test survey flow with seeded data; verify mobile responsiveness
+   - Test admin editing on seeded data (onboarding/overall/daily surveys)
+   - Run full migrations/tests with updated survey system
+   - Audit backend APIs for question editing support (e.g., /api/intros/admin, /api/onboarding/admin, /api/surveys/admin)
 
 ## Blockers / Notes
 - Use git history for old survey module logic if needed (e.g., template CONFIG for types/days).

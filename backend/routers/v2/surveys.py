@@ -20,6 +20,21 @@ async def list_templates():
         raise HTTPException(status_code=500, detail="Unable to load surveys")
 
 
+@router.get("/templates/{template_id}")
+async def get_template(template_id: int):
+    try:
+        templates = survey_service.list_templates()
+        template = next((t for t in templates if t["id"] == template_id), None)
+        if template is None:
+            raise HTTPException(status_code=404, detail="Survey template not found")
+        return template
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover
+        logger.error("Failed to get survey template %s: %s", template_id, exc)
+        raise HTTPException(status_code=500, detail="Unable to load survey template")
+
+
 @router.get("/templates/{template_id}/questions")
 async def list_questions(template_id: int):
     try:

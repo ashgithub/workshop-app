@@ -376,81 +376,8 @@ class DatabaseConnection:
 
 
 
-        print("Seeding survey templates...")
-        try:
-            self.execute_dml(
-                """
-                MERGE INTO SURVEY_TEMPLATES t
-                USING (SELECT :slug AS SLUG FROM DUAL) src
-                ON (t.SLUG = src.SLUG)
-                WHEN NOT MATCHED THEN
-                    INSERT (NAME, SLUG, DESCRIPTION)
-                    VALUES (:name, :slug, :description)
-                """,
-                {
-                    "name": "Post-Event Feedback",
-                    "slug": "post-workshop",
-                    "description": "Collect reflections after the workshop.",
-                },
-            )
-            print("✓ Survey templates seeded")
-        except Exception as exc:
-            print(f"✗ Failed to seed survey templates: {exc}")
-            raise
-
-        print("Seeding survey questions...")
-        try:
-            survey_row = self.execute_query("SELECT ID FROM SURVEY_TEMPLATES WHERE SLUG = :slug", {"slug": "post-workshop"})
-            survey_id = None
-            if survey_row:
-                survey_id = survey_row[0][0]
-                questions = [
-                    {
-                        "prompt": "Overall, how satisfied are you with the workshop?",
-                        "kind": "likert",
-                        "options": '{\"scale\":5}',
-                        "display_order": 1,
-                        "required": "Y",
-                    },
-                    {
-                        "prompt": "What was the highlight for you?",
-                        "kind": "text",
-                        "options": None,
-                        "display_order": 2,
-                        "required": "N",
-                    },
-                    {
-                        "prompt": "Where can we improve?",
-                        "kind": "text",
-                        "options": None,
-                        "display_order": 3,
-                        "required": "N",
-                    },
-                ]
-                for question in questions:
-                    params = question | {"template_id": survey_id}
-                    self.execute_dml(
-                        """
-                        MERGE INTO SURVEY_QUESTIONS t
-                        USING (SELECT :template_id AS TEMPLATE_ID, :prompt AS PROMPT FROM DUAL) src
-                        ON (t.TEMPLATE_ID = src.TEMPLATE_ID AND t.PROMPT = src.PROMPT)
-                        WHEN NOT MATCHED THEN
-                            INSERT (TEMPLATE_ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED)
-                            VALUES (:template_id, :prompt, :kind, :options, :display_order, :required)
-                        WHEN MATCHED THEN
-                            UPDATE SET QUESTION_TYPE = :kind,
-                                       OPTIONS = :options,
-                                       DISPLAY_ORDER = :display_order,
-                                       REQUIRED = :required
-                        """,
-                        params,
-                    )
-            print("✓ Survey questions seeded")
-        except Exception as exc:
-            print(f"✗ Failed to seed survey questions: {exc}")
-            raise
-
-
+        # Seed survey templates and questions
+        self.seed_survey_questions()
 
         intro_questions = [
             {
@@ -810,42 +737,91 @@ class DatabaseConnection:
     def seed_survey_questions(self):
         print("Seeding survey templates and questions...")
         try:
+            # Create all 7 survey templates (onboarding first)
             templates = [
-                ("Onboarding Survey", "onboarding", "Pre-workshop feedback and setup check", "Y"),
-                ("Day 1 Feedback", "day1", "Workshop Day 1 survey", "Y"),
-                ("Day 2 Feedback", "day2", "Workshop Day 2 survey", "Y"),
-                ("Overall Survey", "overall", "Post-workshop wrap-up survey", "Y"),
+                ("Onboarding Survey", "onboarding", "Pre-workshop expectations and preparation", "Y"),
+                ("Day 1 Feedback", "day1", "Monday: LLMs & RAG workshop feedback", "Y"),
+                ("Day 2 Feedback", "day2", "Tuesday: Function Calling & Agents feedback", "Y"),
+                ("Day 3 Feedback", "day3", "Wednesday: Database & Speech feedback", "Y"),
+                ("Day 4 Feedback", "day4", "Thursday: Vision & Demos feedback", "Y"),
+                ("Day 5 Feedback", "day5", "Friday: Dev Productivity feedback", "Y"),
+                ("Overall Survey", "overall", "Post-workshop wrap-up and reflections", "Y"),
             ]
+
+            template_ids = {}
             for name, slug, desc, active in templates:
                 existing = self.fetch_one("SELECT ID FROM SURVEY_TEMPLATES WHERE SLUG = :slug", {"slug": slug})
                 if not existing:
-                    self.execute_dml("""
+                    template_id = self.execute_returning("""
                         INSERT INTO SURVEY_TEMPLATES (NAME, SLUG, DESCRIPTION, ACTIVE)
                         VALUES (:name, :slug, :description, :active)
+                        RETURNING ID INTO :out_id
                     """, {"name": name, "slug": slug, "description": desc, "active": active})
+                    template_ids[slug] = template_id
+                else:
+                    template_ids[slug] = existing[0]
 
-            questions = [
-                # Onboarding
-                (1, "What do you expect from the workshop?", "text", None, 1, "Y"),
-                (1, "Any prerequisites completed?", "choice", "['Yes', 'No']", 2, "Y"),
-                # Day 1
-                (2, "How was Day 1?", "textarea", None, 1, "Y"),
-                (2, "Favorite session?", "text", None, 2, "Y"),
-                # Day 2
-                (3, "How was Day 2?", "textarea", None, 1, "Y"),
-                (3, "Key takeaways?", "text", None, 2, "Y"),
-                # Overall
-                (4, "Overall rating?", "choice", "['Excellent', 'Good', 'Average', 'Poor']", 1, "Y"),
-                (4, "What was your favorite part?", "text", None, 2, "Y"),
-                (4, "Suggestions for improvement?", "textarea", None, 3, "Y"),
-            ]
-            for template_id, prompt, qtype, options, order, required in questions:
-                existing = self.fetch_one("SELECT ID FROM SURVEY_QUESTIONS WHERE TEMPLATE_ID = :tid AND PROMPT = :prompt", {"tid": template_id, "prompt": prompt})
-                if not existing:
-                    self.execute_dml("""
-                        INSERT INTO SURVEY_QUESTIONS (TEMPLATE_ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED)
-                        VALUES (:tid, :prompt, :qtype, :options, :order, :required)
-                    """, {"tid": template_id, "prompt": prompt, "qtype": qtype, "options": options, "order": order, "required": required})
+            # Define questions for each survey
+            survey_questions = {
+                "onboarding": [
+                    ("How excited are you for the workshop?", "choice", '{"options":[{"value":"5","label":"Very Excited"},{"value":"4","label":"Excited"},{"value":"3","label":"Neutral"},{"value":"2","label":"Not Very Excited"},{"value":"1","label":"Not Excited"}]}', 1, "Y"),
+                    ("What do you hope to learn?", "textarea", None, 2, "Y"),
+                    ("Any specific topics you're interested in?", "text", None, 3, "N"),
+                ],
+                "day1": [
+                    ("How would you rate today's session on LLMs & RAG?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was your biggest takeaway from today?", "textarea", None, 2, "Y"),
+                    ("What would you like to explore more?", "text", None, 3, "N"),
+                    ("Any challenges with the content?", "text", None, 4, "N"),
+                ],
+                "day2": [
+                    ("How would you rate today's session on Function Calling & Agents?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was your biggest takeaway from today?", "textarea", None, 2, "Y"),
+                    ("What would you like to explore more?", "text", None, 3, "N"),
+                    ("Any challenges with the content?", "text", None, 4, "N"),
+                ],
+                "day3": [
+                    ("How would you rate today's session on Database & Speech?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was your biggest takeaway from today?", "textarea", None, 2, "Y"),
+                    ("What would you like to explore more?", "text", None, 3, "N"),
+                    ("Any challenges with the content?", "text", None, 4, "N"),
+                ],
+                "day4": [
+                    ("How would you rate today's session on Vision & Demos?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was your biggest takeaway from today?", "textarea", None, 2, "Y"),
+                    ("What would you like to explore more?", "text", None, 3, "N"),
+                    ("Any challenges with the content?", "text", None, 4, "N"),
+                ],
+                "day5": [
+                    ("How would you rate today's session on Dev Productivity?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was your biggest takeaway from today?", "textarea", None, 2, "Y"),
+                    ("What would you like to explore more?", "text", None, 3, "N"),
+                    ("Any challenges with the content?", "text", None, 4, "N"),
+                ],
+                "overall": [
+                    ("Overall, how would you rate the workshop?", "choice", '{"options":[{"value":"5","label":"Excellent"},{"value":"4","label":"Very Good"},{"value":"3","label":"Good"},{"value":"2","label":"Fair"},{"value":"1","label":"Poor"}]}', 1, "Y"),
+                    ("What was the highlight of the week for you?", "textarea", None, 2, "Y"),
+                    ("How has this workshop changed your approach to AI?", "textarea", None, 3, "Y"),
+                    ("What was your favorite session/topic?", "text", None, 4, "N"),
+                    ("Suggestions for improvement?", "textarea", None, 5, "N"),
+                    ("Would you recommend this workshop to others?", "choice", '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}', 6, "Y"),
+                ],
+            }
+
+            # Insert questions for each survey
+            for slug, questions in survey_questions.items():
+                template_id = template_ids[slug]
+                for prompt, qtype, options, order, required in questions:
+                    existing = self.fetch_one(
+                        "SELECT ID FROM SURVEY_QUESTIONS WHERE TEMPLATE_ID = :tid AND PROMPT = :prompt",
+                        {"tid": template_id, "prompt": prompt}
+                    )
+                    if not existing:
+                        self.execute_dml("""
+                            INSERT INTO SURVEY_QUESTIONS (TEMPLATE_ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED)
+                            VALUES (:tid, :prompt, :qtype, :options, :display_order, :required)
+                        """, {"tid": template_id, "prompt": prompt, "qtype": qtype, "options": options, "display_order": order, "required": required})
+
             print("✓ Survey templates and questions seeded")
         except Exception as exc:
             print(f"✗ Failed to seed survey templates and questions: {exc}")
@@ -926,38 +902,39 @@ class DatabaseConnection:
         return True
 
     def reset_data(self) -> bool:
-        """Reset data by truncating tables and reseeding, without rebuilding schema."""
+        """Reset data by deleting from tables and reseeding, without rebuilding schema."""
         print("Starting data reset...")
         try:
-            # Truncate tables in dependency order (reverse of creation/insertion)
-            truncate_statements = [
-                "TRUNCATE TABLE GAME_LOGS",
-                "TRUNCATE TABLE ATTENDEE_INTRO_RESPONSES",
-                "TRUNCATE TABLE ATTENDEE_ONBOARDING_RESPONSES",
-                "TRUNCATE TABLE SURVEY_ANSWERS",
-                "TRUNCATE TABLE SURVEY_SUBMISSIONS",
-                "TRUNCATE TABLE SURVEY_QUESTIONS",
-                "TRUNCATE TABLE SURVEY_TEMPLATES",
-                "TRUNCATE TABLE ATTENDEES",
-                "TRUNCATE TABLE COHORTS",
-                "TRUNCATE TABLE INTRO_QUESTIONS",
-                "TRUNCATE TABLE ONBOARDING_QUESTIONS",
-                "TRUNCATE TABLE ADMIN_USERS",
+            # Delete data in dependency order (reverse of creation/insertion)
+            delete_statements = [
+                "DELETE FROM GAME_LOGS",
+                "DELETE FROM ATTENDEE_INTRO_RESPONSES",
+                "DELETE FROM ATTENDEE_ONBOARDING_RESPONSES",
+                "DELETE FROM SURVEY_ANSWERS",
+                "DELETE FROM SURVEY_SUBMISSIONS",
+                "DELETE FROM SURVEY_QUESTIONS",
+                "DELETE FROM SURVEY_TEMPLATES",
+                "DELETE FROM ATTENDEES",
+                "DELETE FROM COHORTS",
+                "DELETE FROM INTRO_QUESTIONS",
+                "DELETE FROM ONBOARDING_QUESTIONS",
+                "DELETE FROM ADMIN_USERS",
             ]
 
-            for stmt in truncate_statements:
-                table_name = stmt.replace("TRUNCATE TABLE ", "").strip()
-                print(f"Truncating table: {table_name}")
+            for stmt in delete_statements:
+                table_name = stmt.replace("DELETE FROM ", "").strip()
+                print(f"Clearing table: {table_name}")
                 try:
-                    self.execute_dml(stmt)
-                    print(f"✓ Truncated table: {table_name}")
+                    result = self.execute_dml(stmt)
+                    print(f"✓ Cleared table: {table_name} ({result} rows)")
                 except Exception as exc:
-                    print(f"✗ Failed to truncate table: {table_name} - {exc}")
-                    return False
+                    print(f"✗ Failed to clear table: {table_name} - {exc}")
+                    # Continue with other tables even if one fails
+                    # return False
 
-            print("✓ Data truncation completed")
+            print("✓ Data clearing completed")
         except Exception as exc:
-            print(f"✗ Data truncation failed: {exc}")
+            print(f"✗ Data clearing failed: {exc}")
             return False
 
         try:
