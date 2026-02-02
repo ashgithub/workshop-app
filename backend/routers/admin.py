@@ -155,7 +155,8 @@ async def get_all_attendees(
 
         # Sorting
         valid_sort_fields = ["a.FULL_NAME", "c.LOCATION_NAME", "overall_progress", "intro_completed_count", "tasks_completed", "surveys_completed", "a.ACKNOWLEDGED"]
-        sort_field = next((field for field in valid_sort_fields if sort_by.lower() in field.lower()), "a.FULL_NAME")
+        sort_by_lower = (sort_by or "").lower()
+        sort_field = next((field for field in valid_sort_fields if sort_by_lower in field.lower()), "a.FULL_NAME")
         if sort_by == "name":
             sort_field = "a.FULL_NAME"
         elif sort_by == "location":
@@ -353,4 +354,257 @@ async def reorder_onboarding_questions(order_map: list[dict]):
         return {"message": "Questions reordered"}
     except Exception as e:
         logger.error(f"Error reordering onboarding questions: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Game Management Endpoints
+@router.get("/game/attendees")
+async def get_game_attendees(location: Optional[str] = None):
+    """
+    Get all attendees with their 2TL statements and game status for admin management.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required")
+
+        # Get attendees with their 2TL responses and game status
+        query = """
+        SELECT
+            a.ID,
+            a.FULL_NAME,
+            a.EMAIL,
+            c.LOCATION_NAME,
+            ir1.RESPONSE as TL1,
+            ir2.RESPONSE as TL2,
+            ir3.RESPONSE as TL3,
+            COALESCE(gl.STATUS, 'PENDING') as GAME_STATUS,
+            gl.REVEALED_LIE
+        FROM ATTENDEES a
+        JOIN COHORTS c ON c.ID = a.COHORT_ID
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir1 ON ir1.ATTENDEE_ID = a.ID AND ir1.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_1')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir2 ON ir2.ATTENDEE_ID = a.ID AND ir2.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_2')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir3 ON ir3.ATTENDEE_ID = a.ID AND ir3.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_3')
+        LEFT JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+        WHERE c.LOCATION_NAME = :location
+        ORDER BY a.FULL_NAME
+        """
+
+        result = db.execute_query(query, {"location": location})
+
+        if not result:
+            return {"attendees": []}
+
+        attendees = []
+        for row in result:
+            attendee = {
+                "id": row[0],
+                "name": row[1],
+                "email": row[2],
+                "location": row[3],
+                "tl1": row[4],
+                "tl2": row[5],
+                "tl3": row[6],
+                "game_status": row[7] or "PENDING",
+                "revealed_lie": row[8]
+            }
+            attendees.append(attendee)
+
+        return {"attendees": attendees}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting game attendees for location {location}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/game/progress")
+async def get_game_progress(location: Optional[str] = None):
+    """
+    Get progress for 2 Truths and a Lie game: number played vs total attendees for a location.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required")
+
+        # Total: all attendees in location with statements
+        total_result = db.execute_query("""
+            SELECT COUNT(DISTINCT a.ID)
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            JOIN ATTENDEE_INTRO_RESPONSES ir ON ir.ATTENDEE_ID = a.ID
+            JOIN INTRO_QUESTIONS iq ON iq.ID = ir.QUESTION_ID AND iq.CODE IN ('truth_1', 'truth_2', 'truth_3')
+            WHERE c.LOCATION_NAME = :location
+            AND LENGTH(TRIM(ir.RESPONSE)) > 0
+        """, {"location": location})
+        total = total_result[0][0] if total_result and len(total_result) > 0 else 0
+
+        # Played: attendees marked as played in GAME_LOGS
+        played_result = db.execute_query("""
+            SELECT COUNT(*)
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+            WHERE c.LOCATION_NAME = :location
+            AND gl.STATUS = 'PLAYED'
+        """, {"location": location})
+        played_count = played_result[0][0] if played_result and len(played_result) > 0 else 0
+
+        return {"played": played_count, "total": total, "progress": f"{played_count}/{total}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting game progress for location {location}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/game/next")
+async def get_next_game_attendee(location: Optional[str] = None):
+    """
+    Get random attendee who hasn't played yet for the 2TL game.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required")
+
+        # Get random attendee who hasn't played and has statements
+        result = db.execute_query("""
+            SELECT
+                a.ID,
+                a.FULL_NAME,
+                a.EMAIL,
+                c.LOCATION_NAME,
+                ir1.RESPONSE as INTRO,
+                ir2.RESPONSE as TL1,
+                ir3.RESPONSE as TL2,
+                ir4.RESPONSE as TL3,
+                COALESCE(gl.STATUS, 'PENDING') as GAME_STATUS
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir1 ON ir1.ATTENDEE_ID = a.ID AND ir1.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'intro')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir2 ON ir2.ATTENDEE_ID = a.ID AND ir2.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_1')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir3 ON ir3.ATTENDEE_ID = a.ID AND ir3.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_2')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir4 ON ir4.ATTENDEE_ID = a.ID AND ir4.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_3')
+            LEFT JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+            WHERE c.LOCATION_NAME = :location
+            AND (gl.STATUS IS NULL OR gl.STATUS != 'PLAYED')
+            AND (ir2.RESPONSE IS NOT NULL OR ir3.RESPONSE IS NOT NULL OR ir4.RESPONSE IS NOT NULL)
+            ORDER BY DBMS_RANDOM.VALUE
+            FETCH FIRST 1 ROW ONLY
+        """, {"location": location})
+
+        if not result or len(result) == 0:
+            return {"message": "No more attendees available for the game."}
+
+        row = result[0]
+        attendee = {
+            "id": row[0],
+            "name": row[1],
+            "email": row[2],
+            "location": row[3],
+            "intro": row[4],
+            "tl1": row[5],
+            "tl2": row[6],
+            "tl3": row[7],
+            "game_status": row[8] or "PENDING"
+        }
+
+        return {"attendee": attendee}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting next game attendee for location {location}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/play/{attendee_id}")
+async def mark_attendee_as_played(attendee_id: int):
+    """
+    Mark attendee as having played the 2TL game.
+    """
+    try:
+        # Insert or update GAME_LOGS record
+        db.execute_dml("""
+            MERGE INTO GAME_LOGS gl
+            USING (SELECT :attendee_id AS ATTENDEE_ID FROM DUAL) src
+            ON (gl.ATTENDEE_ID = src.ATTENDEE_ID)
+            WHEN MATCHED THEN
+                UPDATE SET STATUS = 'PLAYED', TIMESTAMP = CURRENT_TIMESTAMP
+            WHEN NOT MATCHED THEN
+                INSERT (ATTENDEE_ID, STATUS, TIMESTAMP)
+                VALUES (:attendee_id, 'PLAYED', CURRENT_TIMESTAMP)
+        """, {"attendee_id": attendee_id})
+
+        return {"message": "Attendee marked as played"}
+
+    except Exception as e:
+        logger.error(f"Error marking attendee {attendee_id} as played: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/reveal/{attendee_id}")
+async def reveal_lie(attendee_id: int, lie_number: int = Query(..., description="Which statement is the lie (1, 2, or 3)")):
+    """
+    Reveal which statement was the lie for an attendee.
+    """
+    try:
+        if lie_number not in [1, 2, 3]:
+            raise HTTPException(status_code=400, detail="Lie number must be 1, 2, or 3")
+
+        # Update GAME_LOGS with revealed lie
+        db.execute_dml("""
+            MERGE INTO GAME_LOGS gl
+            USING (SELECT :attendee_id AS ATTENDEE_ID FROM DUAL) src
+            ON (gl.ATTENDEE_ID = src.ATTENDEE_ID)
+            WHEN MATCHED THEN
+                UPDATE SET STATUS = 'REVEALED', REVEALED_LIE = :lie_number, TIMESTAMP = CURRENT_TIMESTAMP
+            WHEN NOT MATCHED THEN
+                INSERT (ATTENDEE_ID, STATUS, REVEALED_LIE, TIMESTAMP)
+                VALUES (:attendee_id, 'REVEALED', :lie_number, CURRENT_TIMESTAMP)
+        """, {"attendee_id": attendee_id, "lie_number": lie_number})
+
+        return {"message": f"Revealed statement {lie_number} as the lie"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revealing lie for attendee {attendee_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/reset")
+async def reset_game_flags(location: Optional[str] = None):
+    """
+    Reset game flags for all attendees in a specific location.
+    """
+    try:
+        if not location:
+            raise HTTPException(status_code=400, detail="Location parameter required for targeted reset")
+
+        # Check if location exists
+        location_check = db.execute_query(
+            "SELECT COUNT(*) FROM COHORTS WHERE LOCATION_NAME = :location",
+            {"location": location}
+        )
+        if not location_check or location_check[0][0] == 0:
+            raise HTTPException(status_code=404, detail="No attendees found for the specified location")
+
+        # Delete game logs for this location
+        affected_rows = db.execute_dml("""
+            DELETE FROM GAME_LOGS
+            WHERE ATTENDEE_ID IN (
+                SELECT a.ID FROM ATTENDEES a
+                JOIN COHORTS c ON c.ID = a.COHORT_ID
+                WHERE c.LOCATION_NAME = :location
+            )
+        """, {"location": location})
+
+        return {"message": f"Reset game status for {affected_rows} attendees in {location}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting game flags for location {location}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

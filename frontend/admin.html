@@ -28,6 +28,7 @@
                     <button class="tab-btn active" data-tab="cohorts">Cohorts</button>
                     <button class="tab-btn" data-tab="tasks">Onboarding Templates</button>
                     <button class="tab-btn" data-tab="surveys">Surveys</button>
+                    <button class="tab-btn" data-tab="game">2TL Game</button>
                     <button class="tab-btn" data-tab="queries">NL SQL</button>
                 </div>
 
@@ -62,6 +63,23 @@
                         <button class="btn-primary" id="new-survey-btn">New Survey</button>
                     </div>
                     <div id="survey-list" class="survey-list"></div>
+                </section>
+
+                <section id="game-tab" class="tab-content">
+                    <div class="section-header">
+                        <div>
+                            <h2>2 Truths and a Lie Game <span id="game-progress" class="progress-indicator" style="display: none;"></span></h2>
+                            <p class="section-subtext">Interactive icebreaker game for workshop attendees.</p>
+                        </div>
+                    </div>
+                    <div class="game-controls">
+                        <select id="location-select">
+                            <option value="">Select Location</option>
+                        </select>
+                        <button class="btn-primary" id="start-game-btn" style="margin-left: 10px;">Start Game</button>
+                        <button class="btn-secondary" id="reset-game-btn" style="margin-left: 10px;">Reset Game for Location</button>
+                    </div>
+                    <div id="game-display"></div>
                 </section>
 
                 <section id="queries-tab" class="tab-content">
