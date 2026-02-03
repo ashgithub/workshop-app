@@ -1545,14 +1545,47 @@ h3.completed {
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.75);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.metric-row:hover {
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    transform: translateY(-1px);
+}
+
+.metric-label::after {
+    content: ' →';
+    color: var(--rw-accent);
+    font-weight: bold;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+    margin-left: 4px;
+}
+
+.metric-row:hover .metric-label::after {
+    opacity: 1;
+}
+
+.back-btn {
+    font-size: 0.9rem;
+    padding: 6px 12px;
+    align-self: flex-start;
+    margin-bottom: 8px;
+}
+
+.back-btn:hover {
+    background: rgba(59, 91, 219, 0.12);
+    text-decoration: none;
 }
 
 .metric-row.metric-complete {
-    border-left: 4px solid #22c55e;
+    /* Removed green border */
 }
 
 .metric-row.metric-pending {
-    border-left: 4px solid #f59e0b;
+    /* Removed orange border */
 }
 
 .metric-label {
@@ -1565,6 +1598,35 @@ h3.completed {
     font-weight: 700;
     color: #2563eb;
     font-size: 1.05rem;
+}
+
+.attendance-confirmation {
+    margin-top: 10px;
+}
+
+.attendance-confirmed {
+    color: var(--rw-success);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.confirm-attendance-btn {
+    margin-top: 10px;
+}
+
+.attendance-modal-content {
+    text-align: center;
+}
+
+.attendance-modal-content h2 {
+    margin-bottom: 20px;
+    color: var(--rw-foreground);
+}
+
+.attendance-modal-content p {
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+    color: var(--rw-muted);
 }
 
 @media (max-width: 768px) {

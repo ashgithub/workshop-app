@@ -663,17 +663,17 @@ class DatabaseConnection:
                     {
                         "email": "test1@test.org",
                         "full_name": "Jordan Rivera",
-                        "profile_image": "static/images/cropped_images/face_test1_at_test_org.png",
+                        "profile_image": "static/images/default-avatar.svg",
                     },
                     {
                         "email": "test2@test.org",
                         "full_name": "Casey Morgan",
-                        "profile_image": "static/images/cropped_images/face_test2_at_test_org.png",
+                        "profile_image": "static/images/cdefault-avatar.svg",
                     },
                     {
                         "email": "test3@test.org",
                         "full_name": "Taylor Quinn",
-                        "profile_image": "static/images/cropped_images/face_test3_at_test_org.png",
+                        "profile_image": "static/images/default-avatar.svg",
                     },
                 ]
 

@@ -24,15 +24,9 @@
                     <h1 id="attendee-name">Welcome!</h1>
                     <p id="attendee-email"></p>
                     <div id="location-details" class="location-details"></div>
+                    <div id="attendance-confirmation" class="attendance-confirmation"></div>
                     <button id="view-agenda-btn" class="btn-secondary" style="display: none; margin-top: 10px;">View Agenda</button>
                 </div>
-            </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="progress">Progress Overview</button>
-                <button class="tab-btn" data-tab="intro">Introductions</button>
-                <button class="tab-btn" data-tab="tasks">Onboarding Checklist</button>
-                <button class="tab-btn" data-tab="surveys">Surveys</button>
             </div>
 
             <div id="progress-tab" class="tab-content active">
@@ -56,6 +50,7 @@
 
             <div id="tasks-tab" class="tab-content">
                 <div class="section-header">
+                    <button class="btn-ghost back-btn" onclick="navigateToSection('progress')">← Back to Overview</button>
                     <div>
                         <h2>Pre-Workshop Checklist</h2>
                         <p class="section-subtext">Complete these steps before arriving at MDC.</p>
@@ -67,6 +62,7 @@
 
             <div id="surveys-tab" class="tab-content">
                 <div class="section-header">
+                    <button class="btn-ghost back-btn" onclick="navigateToSection('progress')">← Back to Overview</button>
                     <div>
                         <h2>Surveys</h2>
                         <p class="section-subtext">Share feedback during and after the workshop to help us improve.</p>
@@ -81,6 +77,7 @@
 
             <div id="intro-tab" class="tab-content">
                 <div class="section-header">
+                    <button class="btn-ghost back-btn" onclick="navigateToSection('progress')">← Back to Overview</button>
                     <div>
                         <h2>Meet Your Cohort</h2>
                         <p class="section-subtext">Share an introduction and learn about fellow attendees.</p>
@@ -106,6 +103,16 @@
         <div class="modal-content">
             <span class="close">&times;</span>
             <img id="modal-img" src="" alt="Agenda">
+        </div>
+    </div>
+
+    <!-- Attendance Confirmation Modal -->
+    <div id="attendance-modal" class="modal">
+        <div class="modal-content attendance-modal-content">
+            <span class="close">&times;</span>
+            <h2>Confirm Attendance</h2>
+            <p>You are able to attend all 5 days of the workshop in person.</p>
+            <button class="btn-primary" id="confirm-attendance-submit">Confirm</button>
         </div>
     </div>
 

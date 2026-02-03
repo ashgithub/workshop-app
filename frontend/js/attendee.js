@@ -60,6 +60,13 @@ function closeAgendaModal() {
     }
 }
 
+function closeAttendanceModal() {
+    const modal = document.getElementById('attendance-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const attendeeId = getAttendeeId();
     if (!attendeeId) {
@@ -67,9 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    attachTabs();
     loadAttendee(attendeeId);
-    document.getElementById('refresh-tasks')?.addEventListener('click', () => loadAttendee(attendeeId));
 
     const closeBtn = document.querySelector('.close');
     if (closeBtn) {
@@ -82,21 +87,45 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAgendaModal();
         }
     });
-});
 
-function attachTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.getAttribute('data-tab');
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(`${tabName}-tab`)?.classList.add('active');
-        });
+
+
+    const attendanceCloseBtn = document.querySelector('#attendance-modal .close');
+    if (attendanceCloseBtn) {
+        attendanceCloseBtn.onclick = closeAttendanceModal;
+    }
+
+    window.addEventListener('click', event => {
+        const modal = document.getElementById('attendance-modal');
+        if (event.target === modal) {
+            closeAttendanceModal();
+        }
     });
-}
+
+    const confirmSubmitBtn = document.getElementById('confirm-attendance-submit');
+    if (confirmSubmitBtn) {
+        confirmSubmitBtn.addEventListener('click', async () => {
+            const attendeeId = getAttendeeId();
+            if (!attendeeId) return;
+            try {
+                const response = await apiFetch(`/api/attendees/${attendeeId}/ack`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ acknowledged: true }),
+                });
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                showSuccess('Participation confirmed!');
+                closeAttendanceModal();
+                loadAttendee(attendeeId);
+            } catch (error) {
+                console.error('Failed to confirm attendance', error);
+                showMessage('Unable to confirm attendance. Please retry.', 'error');
+            }
+        });
+    }
+});
 
 async function loadAttendee(attendeeId) {
     try {
@@ -108,12 +137,43 @@ async function loadAttendee(attendeeId) {
         const attendee = await response.json();
         renderProfile(attendee);
         renderProgress(attendee.progress || {});
-        renderIntroductions(attendee.intros || [], attendee.progress || {}, attendee.acknowledged || false);
-        renderOnboarding(attendeeId, attendee.onboarding || []);
-        await loadSurveys(attendeeId);
+        // Don't load sections initially - wait for navigation
     } catch (error) {
         console.error('Failed to load attendee', error);
         showMessage('Unable to load your workshop companion dashboard. Please try again.', 'error');
+    }
+}
+
+function navigateToSection(section) {
+    // Hide all tab content
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+
+    // Show the selected section
+    const targetTab = document.getElementById(`${section}-tab`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+
+    // Load data if needed (same as original tabs)
+    const attendeeId = getAttendeeId();
+    if (!attendeeId) return;
+
+    switch (section) {
+        case 'tasks':
+            loadOnboarding(attendeeId);
+            break;
+        case 'surveys':
+            loadSurveys(attendeeId);
+            break;
+        case 'intro':
+            // Load attendee data and render introductions
+            apiFetch(`/api/attendees/${attendeeId}`)
+                .then(res => res.json())
+                .then(attendee => {
+                    const progress = attendee.progress || {};
+                    renderIntroductions(attendee.intros || [], progress, attendee.acknowledged || false);
+                });
+            break;
     }
 }
 
@@ -122,6 +182,7 @@ function renderProfile(attendee) {
     const emailEl = document.getElementById('attendee-email');
     const locationEl = document.getElementById('location-details');
     const avatarEl = document.getElementById('profile-img');
+    const confirmationEl = document.getElementById('attendance-confirmation');
 
     nameEl.textContent = attendee.full_name || 'AI Workshop Companion';
     emailEl.textContent = attendee.email;
@@ -148,6 +209,25 @@ function renderProfile(attendee) {
             avatarEl.src = imagePath;
         } else {
             avatarEl.src = 'static/images/default-avatar.svg';
+        }
+    }
+
+    if (confirmationEl) {
+        const acknowledged = attendee.acknowledged || false;
+        if (acknowledged) {
+            confirmationEl.innerHTML = '<p class="attendance-confirmed">✓ Participation Confirmed</p>';
+        } else {
+            confirmationEl.innerHTML = '<button class="btn-primary confirm-attendance-btn" id="confirm-attendance-btn">Confirm Attendance</button>';
+            // Add event listener to the newly created button
+            const confirmBtn = document.getElementById('confirm-attendance-btn');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', () => {
+                    const modal = document.getElementById('attendance-modal');
+                    if (modal) {
+                        modal.style.display = 'block';
+                    }
+                });
+            }
         }
     }
 
@@ -225,13 +305,6 @@ function renderProgress(progress) {
 
     const sections = [
         {
-            key: 'ack',
-            label: 'Workshop acknowledgment',
-            summary: `${progress.ack_completed ? 1 : 0} / ${progress.ack_total || 1}`,
-            total: progress.ack_total || 1,
-            completed: progress.ack_completed ? 1 : 0,
-        },
-        {
             key: 'intro',
             label: 'Introductions',
             summary: `${progress.intro_completed || 0} / ${progress.intro_total || 0}`,
@@ -260,13 +333,21 @@ function renderProgress(progress) {
             const icon = complete ? '✅' : '🔄';
             const statusClass = complete ? 'metric-complete' : 'metric-pending';
             return `
-                <div class="metric-row ${statusClass}">
+                <div class="metric-row ${statusClass}" data-section="${section.key}">
                     <span class="metric-label">${icon} ${section.label}</span>
                     <span class="metric-value">${section.summary}</span>
                 </div>
             `;
         })
         .join('');
+
+    // Add click handlers for navigation
+    metrics.querySelectorAll('.metric-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const section = row.getAttribute('data-section');
+            navigateToSection(section);
+        });
+    });
 
 }
 
@@ -1127,33 +1208,6 @@ function renderIntroductions(intros, progress, acknowledged) {
     const truthAnswered = truthIntros.filter(i => i.response && i.response.trim()).length;
 
     let html = '';
-    // Acknowledgement Section
-    const ackCompleted = acknowledged ? 1 : 0;
-    html += `
-        <section class="intro-section" data-section="ack">
-            <header class="section-header">
-                <h3>Acknowledgement</h3>
-                <div class="section-progress" data-progress="ack">${ackCompleted} / 1</div>
-            </header>
-            <div class="field-group ${acknowledged ? 'completed' : ''}">
-                <div class="field-header">
-                    <div class="field-title">Workshop guidelines acknowledgement</div>
-                    <div class="field-status ${acknowledged ? 'complete' : 'pending'}">
-                        <span class="status-icon">${acknowledged ? '✓' : '○'}</span>
-                        ${acknowledged ? 'Complete' : 'Pending'}
-                    </div>
-                </div>
-                <div class="intro-input">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="ack-checkbox" ${acknowledged ? 'checked disabled' : ''}>
-                        <span>I acknowledge that I have read and agree to the workshop guidelines and code of conduct.</span>
-                    </label>
-                    ${acknowledged ? '' : '<button class="btn-secondary ack-btn" id="ack-save">Submit acknowledgement</button>'}
-                </div>
-            </div>
-        </section>
-    `;
-
     // Introduction Section
     html += `
         <section class="intro-section" data-section="intro">
@@ -1166,34 +1220,6 @@ function renderIntroductions(intros, progress, acknowledged) {
     `;
 
     list.innerHTML = html;
-
-    const ackSaveBtn = document.getElementById('ack-save');
-    if (ackSaveBtn) {
-        ackSaveBtn.addEventListener('click', async () => {
-            const checkbox = document.getElementById('ack-checkbox');
-            if (!checkbox.checked) {
-                showMessage('Please check the acknowledgement box first.', 'error');
-                return;
-            }
-            const attendeeId = getAttendeeId();
-            if (!attendeeId) return;
-            try {
-                const ackResponse = await apiFetch(`/api/attendees/${attendeeId}/ack`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ acknowledged: true }),
-                });
-                if (!ackResponse.ok) {
-                    throw new Error(await ackResponse.text());
-                }
-                showSuccess('Acknowledgement saved');
-                loadAttendee(attendeeId);
-            } catch (error) {
-                console.error('Failed to save acknowledgement', error);
-                showMessage('Unable to save acknowledgement. Please retry.', 'error');
-            }
-        });
-    }
 
     // Individual Save Listeners
     list.querySelectorAll('[data-question]').forEach(input => {
