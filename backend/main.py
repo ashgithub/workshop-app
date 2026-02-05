@@ -4,6 +4,7 @@ Main FastAPI application for AI Workshop Companion system.
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import cast
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -125,18 +126,29 @@ if frontend_path.exists():
             response = await super().get_response(path, scope)
             if path.endswith('.html') and hasattr(response, 'body'):
                 # Inject proxy config into HTML
-                html_content = response.body.decode('utf-8')
+                # Handle both bytes and memoryview
+                if isinstance(response.body, memoryview):
+                    body_bytes = response.body.tobytes()
+                else:
+                    body_bytes = response.body
+
+                html_content = body_bytes.decode('utf-8')
                 proxy_config_script = f"""
+<script>
 window.PROXY_CONFIG = {{
     enabled: {str(config.proxy_enabled).lower()},
     bearerToken: "{config.proxy_bearer_token}",
     basePath: "{config.proxy_prefix}"
 }};
+</script>
                 """
-                html_content = html_content.replace(
-                    'window.PROXY_CONFIG = {',
-                    proxy_config_script.strip()
-                )
+                # Inject before closing </head> tag
+                if '</head>' in html_content:
+                    html_content = html_content.replace('</head>', proxy_config_script + '</head>')
+                else:
+                    # Fallback: prepend to body content
+                    html_content = proxy_config_script + html_content
+
                 response.body = html_content.encode('utf-8')
                 response.headers['content-length'] = str(len(response.body))
             return response
