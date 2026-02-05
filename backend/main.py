@@ -125,6 +125,8 @@ if frontend_path.exists():
         async def get_response(self, path: str, scope):
             response = await super().get_response(path, scope)
             if path.endswith('.html') and hasattr(response, 'body'):
+                print(f"DEBUG: Injecting proxy config for path: {path}")
+
                 # Inject proxy config into HTML
                 # Handle both bytes and memoryview
                 if isinstance(response.body, memoryview):
@@ -133,6 +135,9 @@ if frontend_path.exists():
                     body_bytes = response.body
 
                 html_content = body_bytes.decode('utf-8')
+                print(f"DEBUG: Original HTML length: {len(html_content)}")
+                print(f"DEBUG: Contains </head>: {'</head>' in html_content}")
+
                 proxy_config_script = f"""
 <script>
 window.PROXY_CONFIG = {{
@@ -142,15 +147,21 @@ window.PROXY_CONFIG = {{
 }};
 </script>
                 """
+                print(f"DEBUG: Config values - enabled: {config.proxy_enabled}, prefix: {config.proxy_prefix}")
+
                 # Inject before closing </head> tag
                 if '</head>' in html_content:
                     html_content = html_content.replace('</head>', proxy_config_script + '</head>')
+                    print("DEBUG: Injected before </head>")
                 else:
                     # Fallback: prepend to body content
                     html_content = proxy_config_script + html_content
+                    print("DEBUG: Prepended to content (no </head> found)")
 
                 response.body = html_content.encode('utf-8')
                 response.headers['content-length'] = str(len(response.body))
+                print(f"DEBUG: Final HTML length: {len(html_content)}")
+                print(f"DEBUG: Contains PROXY_CONFIG: {'window.PROXY_CONFIG' in html_content}")
             return response
 
     app.mount("/", ConfigInjectingStaticFiles(directory=str(frontend_path), html=True), name="frontend")
