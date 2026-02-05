@@ -91,6 +91,11 @@ async def health_check():
         "version": "1.0.0"
     }
 
+@app.get("/api/page-sections")
+async def get_page_sections():
+    """Get page section configuration."""
+    return config.page_sections
+
 @app.get("/", include_in_schema=False)
 async def serve_root():
     return RedirectResponse(url="index.html")

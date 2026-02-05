@@ -40,10 +40,8 @@
    - Game functionality removed (was dependent on legacy STUDENTS table).
 
 2. **UI/UX Improvements**
-   - Move acknowledgment checkbox to user panel (more prominent placement)
    - Add descriptive tasks/examples for introduction questions (what to include in intro text)
    - Include links to details for intro & onboarding (link to canvas in slack)
-   - agenda button
    - for intro have  default tyext in text area simiar to surveys 
 
 3. **Full Testing & Polish**

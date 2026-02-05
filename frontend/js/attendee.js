@@ -67,6 +67,43 @@ function closeAttendanceModal() {
     }
 }
 
+function renderPageSections(pageSections) {
+    // Update intro section
+    if (pageSections.intro) {
+        const introTitle = document.querySelector('#intro-tab h2');
+        const introDesc = document.querySelector('#intro-tab .section-subtext');
+        if (introTitle) introTitle.textContent = pageSections.intro.title || 'Meet Your Cohort';
+        if (introDesc) introDesc.innerHTML = renderDescriptionWithLink(pageSections.intro);
+    }
+
+    // Update tasks section
+    if (pageSections.tasks) {
+        const tasksTitle = document.querySelector('#tasks-tab h2');
+        const tasksDesc = document.querySelector('#tasks-tab .section-subtext');
+        if (tasksTitle) tasksTitle.textContent = pageSections.tasks.title || 'Pre-Workshop Checklist';
+        if (tasksDesc) tasksDesc.innerHTML = renderDescriptionWithLink(pageSections.tasks);
+    }
+
+    // Update surveys section
+    if (pageSections.surveys) {
+        const surveysTitle = document.querySelector('#surveys-tab h2');
+        const surveysDesc = document.querySelector('#surveys-tab .section-subtext');
+        if (surveysTitle) surveysTitle.textContent = pageSections.surveys.title || 'Surveys';
+        if (surveysDesc) surveysDesc.innerHTML = renderDescriptionWithLink(pageSections.surveys);
+    }
+}
+
+function renderDescriptionWithLink(section) {
+    const description = section.description || '';
+    const linkText = section.link_text;
+    const linkUrl = section.link_url;
+
+    if (linkText && linkUrl) {
+        return `${description} see <a href="${linkUrl}" target="_blank">[${linkText}]</a> for details`;
+    }
+    return description;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const attendeeId = getAttendeeId();
     if (!attendeeId) {
@@ -135,8 +172,14 @@ async function loadAttendee(attendeeId) {
             throw new Error(await response.text());
         }
         const attendee = await response.json();
+
+        // Load page sections configuration
+        const sectionsResponse = await apiFetch('/api/page-sections');
+        const pageSections = sectionsResponse.ok ? await sectionsResponse.json() : {};
+
         renderProfile(attendee);
         renderProgress(attendee.progress || {});
+        renderPageSections(pageSections);
         // Don't load sections initially - wait for navigation
     } catch (error) {
         console.error('Failed to load attendee', error);

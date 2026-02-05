@@ -113,6 +113,10 @@ class Config:
             value = value.split(':', 1)[0]
         return str(value).lower() == 'true'
 
+    @property
+    def page_sections(self) -> dict:
+        return self._config.get('page_sections', {})
+
 
 # Global config instance
 config = Config()

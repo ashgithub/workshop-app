@@ -17,3 +17,20 @@ proxy:
   enabled: $PROXY_ENABLED:false
   prefix: $PROXY_PREFIX:/workshop-app
   bearer_token: $PROXY_BEARER_TOKEN
+
+page_sections:
+  intro:
+    title: "Meet Your Cohort"
+    description: "Share an introduction and learn about fellow attendees."
+    link_text: See a sample introduction from Ashish here
+    link_url: https://oracle.enterprise.slack.com/docs/T0251MHA2/F0AD1BLU1BL
+  tasks:
+    title: "Pre-Workshop Checklist"
+    description: "Complete these steps before arriving at MDC."
+    link_text: Reference the details for each onboaridng step here
+    link_url: https://oracle.enterprise.slack.com/docs/T0251MHA2/F0AC7HBUFA6
+  surveys:
+    title: "Surveys"
+    description: "Share feedback during the workshop to help us improve."
+    link_text: null
+    link_url: null
