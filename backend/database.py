@@ -105,9 +105,6 @@ class DatabaseConnection:
             "DROP TABLE SURVEY_SUBMISSIONS CASCADE CONSTRAINTS",
             "DROP TABLE SURVEY_QUESTIONS CASCADE CONSTRAINTS",
             "DROP TABLE SURVEY_TEMPLATES CASCADE CONSTRAINTS",
-            "DROP TABLE ATTENDEE_TASKS CASCADE CONSTRAINTS",
-            "DROP TABLE COHORT_TASK_TEMPLATES CASCADE CONSTRAINTS",
-            "DROP TABLE ONBOARDING_TASK_TEMPLATES CASCADE CONSTRAINTS",
             "DROP TABLE GAME_LOGS CASCADE CONSTRAINTS",
             "DROP TABLE ATTENDEES CASCADE CONSTRAINTS",
             "DROP TABLE ADMIN_USERS CASCADE CONSTRAINTS",
@@ -116,11 +113,6 @@ class DatabaseConnection:
             "DROP TABLE ONBOARDING_QUESTIONS CASCADE CONSTRAINTS",
             "DROP TABLE ATTENDEE_INTRO_RESPONSES CASCADE CONSTRAINTS",
             "DROP TABLE ATTENDEE_ONBOARDING_RESPONSES CASCADE CONSTRAINTS",
-            # Legacy tables removed - no longer used
-            # "DROP TABLE STUDENTS CASCADE CONSTRAINTS",
-            # "DROP TABLE ONBOARDING_TASK_TEMPLATES CASCADE CONSTRAINTS",
-            # "DROP TABLE COHORT_TASK_TEMPLATES CASCADE CONSTRAINTS",
-            # "DROP TABLE ATTENDEE_TASKS CASCADE CONSTRAINTS",
         ]
 
         for stmt in drop_statements:
@@ -187,6 +179,7 @@ class DatabaseConnection:
                 ACTIVE CHAR(1) DEFAULT 'Y' CHECK (ACTIVE IN ('Y','N')),
                 QUESTION_TYPE VARCHAR2(30) DEFAULT 'text' NOT NULL,
                 CONFIG CLOB,
+                HELP_TEXT VARCHAR2(1000),
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -201,6 +194,7 @@ class DatabaseConnection:
                 ACTIVE CHAR(1) DEFAULT 'Y' CHECK (ACTIVE IN ('Y','N')),
                 QUESTION_TYPE VARCHAR2(30) DEFAULT 'text' NOT NULL,
                 CONFIG CLOB,
+                HELP_TEXT VARCHAR2(1000),
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -231,6 +225,7 @@ class DatabaseConnection:
                 NAME VARCHAR2(255) NOT NULL,
                 SLUG VARCHAR2(60) UNIQUE NOT NULL,
                 DESCRIPTION VARCHAR2(1000),
+                DISPLAY_ORDER NUMBER DEFAULT 0,
                 ACTIVE CHAR(1) DEFAULT 'Y' CHECK (ACTIVE IN ('Y','N')),
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -723,29 +718,35 @@ class DatabaseConnection:
     def seed_survey_questions(self):
         print("Seeding survey templates and questions...")
         try:
-            # Create all 7 survey templates (onboarding first)
+            # Create all 7 survey templates (onboarding first, then day1-5, then overall)
             templates = [
-                ("Onboarding Survey", "onboarding", "Pre-workshop expectations and preparation", "Y"),
-                ("Day 1 Feedback", "day1", "Monday: LLMs & RAG workshop feedback", "Y"),
-                ("Day 2 Feedback", "day2", "Tuesday: Function Calling & Agents feedback", "Y"),
-                ("Day 3 Feedback", "day3", "Wednesday: Database & Speech feedback", "Y"),
-                ("Day 4 Feedback", "day4", "Thursday: Vision & Demos feedback", "Y"),
-                ("Day 5 Feedback", "day5", "Friday: Dev Productivity feedback", "Y"),
-                ("Overall Survey", "overall", "Post-workshop wrap-up and reflections", "Y"),
+                ("Onboarding Survey", "onboarding", "Pre-workshop onboarding and preparation", 1, "Y"),
+                ("Day 1 Feedback", "day1", "Monday: LLM Promot Engineering", 2, "Y"),
+                ("Day 2 Feedback", "day2", "Tuesday: Retrieval-Augmented Generation (RAG)", 3, "Y"),
+                ("Day 3 Feedback", "day3", "Wednesday: Functions & Tool calling", 4, "Y"),
+                ("Day 4 Feedback", "day4", "Thursday: Agents", 5, "Y"),
+                ("Day 5 Feedback", "day5", "Friday: Dev Productivity", 6, "Y"),
+                ("Overall Survey", "overall", "Overall workshop reflection", 7, "Y"),
             ]
 
             template_ids = {}
-            for name, slug, desc, active in templates:
+            for name, slug, desc, display_order, active in templates:
                 existing = self.fetch_one("SELECT ID FROM SURVEY_TEMPLATES WHERE SLUG = :slug", {"slug": slug})
                 if not existing:
                     template_id = self.execute_returning("""
-                        INSERT INTO SURVEY_TEMPLATES (NAME, SLUG, DESCRIPTION, ACTIVE)
-                        VALUES (:name, :slug, :description, :active)
+                        INSERT INTO SURVEY_TEMPLATES (NAME, SLUG, DESCRIPTION, DISPLAY_ORDER, ACTIVE)
+                        VALUES (:name, :slug, :description, :display_order, :active)
                         RETURNING ID INTO :out_id
-                    """, {"name": name, "slug": slug, "description": desc, "active": active})
+                    """, {"name": name, "slug": slug, "description": desc, "display_order": display_order, "active": active})
                     template_ids[slug] = template_id
                 else:
+                    # Update existing record with display_order if it's missing
                     template_ids[slug] = existing[0]
+                    self.execute_dml("""
+                        UPDATE SURVEY_TEMPLATES
+                        SET DISPLAY_ORDER = :display_order
+                        WHERE ID = :id AND DISPLAY_ORDER IS NULL
+                    """, {"display_order": display_order, "id": existing[0]})
 
             # Define questions for each survey
             survey_questions = {

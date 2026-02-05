@@ -179,6 +179,7 @@ class SurveyTemplate(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
+    display_order: int
     active: bool = True
 
 

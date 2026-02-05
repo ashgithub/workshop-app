@@ -178,7 +178,7 @@ async function loadAttendee(attendeeId) {
         const pageSections = sectionsResponse.ok ? await sectionsResponse.json() : {};
 
         renderProfile(attendee);
-        renderProgress(attendee.progress || {});
+        renderProgress(attendee.progress || {}, pageSections);
         renderPageSections(pageSections);
         // Don't load sections initially - wait for navigation
     } catch (error) {
@@ -327,7 +327,7 @@ function formatTime(value) {
     return value;
 }
 
-function renderProgress(progress) {
+function renderProgress(progress, pageSections = {}) {
     const overall = progress.overall_progress || 0;
     const track = document.getElementById('overall-progress-fill');
     const label = document.getElementById('overall-progress-label');
@@ -349,21 +349,21 @@ function renderProgress(progress) {
     const sections = [
         {
             key: 'intro',
-            label: 'Introductions',
+            label: pageSections.intro?.title || 'Introductions',
             summary: `${progress.intro_completed || 0} of ${progress.intro_total || 0} completed`,
             total: progress.intro_total || 0,
             completed: progress.intro_completed || 0,
         },
         {
             key: 'tasks',
-            label: 'Onboarding checklist',
+            label: pageSections.tasks?.title || 'Onboarding checklist',
             summary: `${progress.tasks_completed || 0} of ${progress.tasks_total || 0} completed`,
             total: progress.tasks_total || 0,
             completed: progress.tasks_completed || 0,
         },
         {
             key: 'surveys',
-            label: 'Surveys',
+            label: pageSections.surveys?.title || 'Surveys',
             summary: `${progress.surveys_completed || 0} of ${progress.surveys_total || 0} completed`,
             total: progress.surveys_total || 0,
             completed: progress.surveys_completed || 0,

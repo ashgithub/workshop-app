@@ -8,10 +8,10 @@ from backend.database import db
 
 def list_templates(active_only: bool = True) -> List[dict]:
     query = """
-    SELECT ID, NAME, SLUG, DESCRIPTION, ACTIVE
+    SELECT ID, NAME, SLUG, DESCRIPTION, DISPLAY_ORDER, ACTIVE
     FROM SURVEY_TEMPLATES
     {where_clause}
-    ORDER BY NAME
+    ORDER BY DISPLAY_ORDER
     """
     where_clause = "WHERE ACTIVE = 'Y'" if active_only else ""
     rows = db.execute_query(query.format(where_clause=where_clause)) or []
@@ -21,7 +21,8 @@ def list_templates(active_only: bool = True) -> List[dict]:
             "name": row[1],
             "slug": row[2],
             "description": row[3],
-            "active": row[4] == 'Y',
+            "display_order": row[4],
+            "active": row[5] == 'Y',
         }
         for row in rows
     ]
