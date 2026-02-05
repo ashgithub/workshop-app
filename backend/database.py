@@ -4,6 +4,8 @@ Database connection and schema management for the Oracle-backed workshop survey 
 from __future__ import annotations
 
 import logging
+import sys
+import traceback
 from contextlib import contextmanager
 from typing import Generator, Optional
 
@@ -22,6 +24,11 @@ class DatabaseConnection:
         self._init_pool()
 
     def _init_pool(self) -> None:
+        print(f"DEBUG: Attempting Oracle connection with:")
+        print(f"  User: {config.oracle_user}")
+        print(f"  DSN: {config.oracle_dsn}")
+        print(f"  Wallet: {config.oracle_wallet}")
+
         try:
             if not all([config.oracle_user, config.oracle_password, config.oracle_dsn]):
                 logger.warning("Oracle credentials not fully configured; database operations disabled")
@@ -41,9 +48,13 @@ class DatabaseConnection:
                 getmode=oracledb.POOL_GETMODE_WAIT,
                 timeout=30,
             )
+            print("DEBUG: Pool creation successful")
             logger.info("Oracle connection pool initialized")
         except Exception as exc:  # pragma: no cover - requires Oracle runtime
-            logger.error("Failed to initialize Oracle pool: %s", exc)
+            error_msg = f"Failed to initialize Oracle pool: {exc}"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            logger.error(error_msg)
+            logger.error("Full traceback: %s", traceback.format_exc())
             self.pool = None
 
     @contextmanager
@@ -823,7 +834,10 @@ class DatabaseConnection:
             self.execute_query("SELECT 1 FROM DUAL")
             return True
         except Exception as exc:
-            logger.error("Oracle connection test failed: %s", exc)
+            error_msg = f"Oracle connection test failed: {exc}"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            logger.error(error_msg)
+            logger.error("Full traceback: %s", traceback.format_exc())
             return False
 
     def initialize_schema(self) -> bool:
