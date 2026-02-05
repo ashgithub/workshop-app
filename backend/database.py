@@ -387,6 +387,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "text",
                 "config": None,
+                "help_text": "Enter your team name",
             },
             {
                 "code": "intro",
@@ -395,6 +396,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "textarea",
                 "config": None,
+                "help_text": "Tell us about your experience with Oracle, OCI Services, Gen AI services, Python. Mention and AI certifications. Also descibe or use of AI for productivity vs developing AI features in products",
             },
             {
                 "code": "truth_1",
@@ -403,6 +405,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "text",
                 "config": None,
+                "help_text": "One of the two truths or a lie",
             },
             {
                 "code": "truth_2",
@@ -411,6 +414,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "text",
                 "config": None,
+                "help_text": "One of the two truths or a lie",
             },
             {
                 "code": "truth_3",
@@ -419,6 +423,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "text",
                 "config": None,
+                "help_text": "One of the two truths or a lie",
             },
             {
                 "code": "device_pref",
@@ -426,7 +431,8 @@ class DatabaseConnection:
                 "order": 6,
                 "required": "Y",
                 "question_type": "choice",
-                "config": '{"options":[{"value":"M","label":"Mac"},{"value":"P","label":"PC"}]}'
+                "config": '{"options":[{"value":"M","label":"Mac"},{"value":"P","label":"PC"}]}',
+                "help_text": None,
             },
             {
                 "code": "tshirt_size",
@@ -434,7 +440,8 @@ class DatabaseConnection:
                 "order": 7,
                 "required": "Y",
                 "question_type": "choice",
-                "config": '{"options":[{"value":"S","label":"Small"},{"value":"M","label":"Medium"},{"value":"L","label":"Large"},{"value":"XL","label":"Extra Large"}]}'
+                "config": '{"options":[{"value":"S","label":"Small"},{"value":"M","label":"Medium"},{"value":"L","label":"Large"},{"value":"XL","label":"Extra Large"}]}',
+                "help_text": None,
             },
         ]
 
@@ -445,14 +452,15 @@ class DatabaseConnection:
                 USING (SELECT :code AS CODE FROM DUAL) src
                 ON (t.CODE = src.CODE)
                 WHEN NOT MATCHED THEN
-                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, QUESTION_TYPE, CONFIG)
-                    VALUES (:code, :prompt, :display_order, :required, :question_type, :config)
+                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, QUESTION_TYPE, CONFIG, HELP_TEXT)
+                    VALUES (:code, :prompt, :display_order, :required, :question_type, :config, :help_text)
         WHEN MATCHED THEN
             UPDATE SET PROMPT = :prompt,
                DISPLAY_ORDER = :display_order,
                REQUIRED = :required,
                QUESTION_TYPE = :question_type,
                CONFIG = :config,
+               HELP_TEXT = :help_text,
                ACTIVE = 'Y',
                UPDATED_AT = CURRENT_TIMESTAMP
                 """,
@@ -463,6 +471,7 @@ class DatabaseConnection:
                     "required": question["required"],
                     "question_type": question["question_type"],
                     "config": question["config"],
+                    "help_text": question["help_text"],
                 },
             )
 
@@ -540,6 +549,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "install_tools",
@@ -548,6 +558,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "sample_code",
@@ -556,6 +567,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "install_cline",
@@ -564,14 +576,16 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "run_code",
                 "prompt": "Have you run the code to verify setup?",
-                "order": 5
+                "order": 5,
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "run_tools",
@@ -580,6 +594,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
             {
                 "code": "tool_setip",
@@ -588,6 +603,7 @@ class DatabaseConnection:
                 "required": "Y",
                 "question_type": "choice",
                 "config": '{"options":[{"value":"Y","label":"Yes"},{"value":"N","label":"No"}]}',
+                "help_text": None,
             },
         ]
 
@@ -598,14 +614,15 @@ class DatabaseConnection:
                 USING (SELECT :code AS CODE FROM DUAL) src
                 ON (t.CODE = src.CODE)
                 WHEN NOT MATCHED THEN
-                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, QUESTION_TYPE, CONFIG)
-                    VALUES (:code, :prompt, :display_order, :required, :question_type, :config)
+                    INSERT (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, QUESTION_TYPE, CONFIG, HELP_TEXT)
+                    VALUES (:code, :prompt, :display_order, :required, :question_type, :config, :help_text)
                 WHEN MATCHED THEN
                     UPDATE SET PROMPT = :prompt,
                                DISPLAY_ORDER = :display_order,
                                REQUIRED = :required,
                                QUESTION_TYPE = :question_type,
                                CONFIG = :config,
+                               HELP_TEXT = :help_text,
                                ACTIVE = 'Y',
                                UPDATED_AT = CURRENT_TIMESTAMP
                 """,
@@ -616,6 +633,7 @@ class DatabaseConnection:
                     "required": question["required"],
                     "question_type": question["question_type"],
                     "config": question["config"],
+                    "help_text": question["help_text"],
                 },
             )
 
@@ -795,29 +813,9 @@ class DatabaseConnection:
             print(f"✗ Failed to seed survey templates and questions: {exc}")
             raise
 
-    def seed_onboarding_tasks(self):
-        tasks = [
-            ("Install VS Code", "Download and install Visual Studio Code for the workshop.", "https://code.visualstudio.com/", "Y", 1),
-            ("Read Guidelines", "Review the workshop code of conduct and guidelines.", None, "Y", 2),
-            ("Set Up Python", "Ensure Python 3.10+ is installed and test with 'python --version'.", None, "Y", 3),
-        ]
-        for title, desc, url, required, order in tasks:
-            existing = self.fetch_one("""
-                SELECT ID FROM ONBOARDING_TASK_TEMPLATES 
-                WHERE TITLE = :title
-            """, {"title": title})
-            if not existing:
-                self.execute_dml("""
-                    INSERT INTO ONBOARDING_TASK_TEMPLATES (TITLE, DESCRIPTION, INSTRUCTIONS_URL, REQUIRED, DISPLAY_ORDER)
-                    VALUES (:title, :desc, :url, :required, :order)
-                """, {"title": title, "desc": desc, "url": url, "required": required, "order": order})
+    # Removed dead code: seed_onboarding_tasks method - tables no longer exist
 
-    def seed_game_logs(self):
-        # Seed some game logs for testing
-        self.execute_dml("""
-            INSERT INTO GAME_LOGS (ATTENDEE_ID, STATUS, REVEALED_LIE, TIMESTAMP)
-            VALUES (1, 'PENDING', NULL, CURRENT_TIMESTAMP)
-        """)
+
 
     def test_connection(self) -> bool:
         try:
@@ -857,14 +855,7 @@ class DatabaseConnection:
             print(f"✗ Survey questions seeding failed: {exc}")
             return False
 
-        # Legacy task seeding removed - tables no longer exist
-
-        try:
-            self.seed_game_logs()
-            print("✓ Game logs seeded")
-        except Exception as exc:
-            print(f"✗ Game logs seeding failed: {exc}")
-            return False
+        # Legacy task seeding and game logs seeding removed - tables no longer exist
 
         print("✓ Database schema initialization completed successfully")
         return True

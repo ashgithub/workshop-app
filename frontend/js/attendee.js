@@ -350,21 +350,21 @@ function renderProgress(progress) {
         {
             key: 'intro',
             label: 'Introductions',
-            summary: `${progress.intro_completed || 0} / ${progress.intro_total || 0}`,
+            summary: `${progress.intro_completed || 0} of ${progress.intro_total || 0} completed`,
             total: progress.intro_total || 0,
             completed: progress.intro_completed || 0,
         },
         {
             key: 'tasks',
             label: 'Onboarding checklist',
-            summary: `${progress.tasks_completed || 0} / ${progress.tasks_total || 0}`,
+            summary: `${progress.tasks_completed || 0} of ${progress.tasks_total || 0} completed`,
             total: progress.tasks_total || 0,
             completed: progress.tasks_completed || 0,
         },
         {
             key: 'surveys',
             label: 'Surveys',
-            summary: `${progress.surveys_completed || 0} / ${progress.surveys_total || 0}`,
+            summary: `${progress.surveys_completed || 0} of ${progress.surveys_total || 0} completed`,
             total: progress.surveys_total || 0,
             completed: progress.surveys_completed || 0,
         },
@@ -410,7 +410,8 @@ async function loadOnboarding(attendeeId) {
 
 function renderOnboarding(attendeeId, onboarding) {
     const container = document.getElementById('task-list');
-    if (!container) return;
+    const pill = document.getElementById('onboarding-progress-pill');
+    if (!container || !pill) return;
     if (!onboarding.length) {
         container.innerHTML = '<p>Onboarding checklist will appear here once available.</p>';
         return;
@@ -419,10 +420,10 @@ function renderOnboarding(attendeeId, onboarding) {
     const completed = onboarding.filter(o => o.response && o.response.trim()).length;
     const total = onboarding.length;
 
+    // Update progress pill
+    pill.textContent = `${completed} of ${total} completed`;
+
     let html = `
-        <div class="onboarding-header">
-            <div class="progress-pill" id="onboarding-progress-pill">${completed} of ${total} completed</div>
-        </div>
         <div class="onboarding-fields">
     `;
 
@@ -451,13 +452,6 @@ function renderOnboarding(attendeeId, onboarding) {
     html += `</div>`;
 
     container.innerHTML = html;
-
-    // Update progress pill
-    const pill = document.getElementById('onboarding-progress-pill');
-    if (pill) {
-        const percent = total ? Math.round((completed / total) * 100) : 0;
-        pill.textContent = `${completed} of ${total} completed`;
-    }
 
     // Individual Save Listeners
     container.querySelectorAll('[data-question]').forEach(input => {
@@ -810,7 +804,7 @@ function updateSurveyProgress() {
 
     const pill = document.getElementById('survey-progress-pill');
     if (pill) {
-        pill.textContent = `${answered} of ${questions.length} answered`;
+        pill.textContent = `${answered} of ${questions.length} completed`;
     }
 }
 
@@ -853,10 +847,10 @@ async function submitSurvey(attendeeId, templateId, questions) {
 
 const surveyRenderers = {
     text: (question, value = '') =>
-        `<input type="text" data-question="${question.id}" value="${value}" placeholder="Enter your response..." class="survey-input">`,
+        `<input type="text" data-question="${question.id}" value="${value}" placeholder="${question.help_text || 'Enter your response...'}" class="survey-input">`,
 
     textarea: (question, value = '') =>
-        `<textarea data-question="${question.id}" placeholder="Enter your response..." class="survey-textarea">${value}</textarea>`,
+        `<textarea data-question="${question.id}" placeholder="${question.help_text || 'Enter your response...'}" class="survey-textarea">${value}</textarea>`,
 
     choice: (question, value = '') => {
         const options = question.options ? JSON.parse(question.options).options || [] : [];
@@ -1021,9 +1015,9 @@ function showError(text) {
 
 const introRenderers = {
     text: (intro, value = '') =>
-        `<input type="text" data-question="${intro.question_id}" value="${value}" placeholder="${intro.prompt}">`,
+        `<input type="text" data-question="${intro.question_id}" value="${value}" placeholder="${intro.help_text || 'Enter your response...'}">`,
     textarea: (intro, value = '') =>
-        `<textarea data-question="${intro.question_id}" placeholder="Write your response...">${value}</textarea>`,
+        `<textarea data-question="${intro.question_id}" placeholder="${intro.help_text || 'Write your response...'}">${value}</textarea>`,
     choice: (intro, value = '') => {
         const options = intro.config?.options || [];
         return `
@@ -1061,9 +1055,9 @@ function getInputValue(intro, container) {
 
 const onboardingRenderers = {
     text: (question, value = '') =>
-        `<input type="text" data-question="${question.question_id}" value="${value}" placeholder="Enter your response...">`,
+        `<input type="text" data-question="${question.question_id}" value="${value}" placeholder="${question.help_text || 'Enter your response...'}">`,
     textarea: (question, value = '') =>
-        `<textarea data-question="${question.question_id}" placeholder="Enter your response...">${value}</textarea>`,
+        `<textarea data-question="${question.question_id}" placeholder="${question.help_text || 'Enter your response...'}">${value}</textarea>`,
     choice: (question, value = '') => {
         const options = question.config?.options || [];
         return `
@@ -1238,14 +1232,11 @@ function renderIntroFields(intros, truthAnswered) {
 function renderIntroductions(intros, progress, acknowledged) {
     const list = document.getElementById('intro-list');
     const pill = document.getElementById('intro-progress-pill');
-    const fill = document.getElementById('intro-progress-fill');
-    if (!list || !pill || !fill) return;
+    if (!list || !pill) return;
 
     const total = progress.intro_total || intros.length;
-    const answered = progress.intro_completed || 0;
-    pill.textContent = `${answered} of ${total} answered`;
-    const percent = total ? Math.round((answered / total) * 100) : 0;
-    fill.style.width = `${percent}%`;
+    const completed = progress.intro_completed || 0;
+    pill.textContent = `${completed} of ${total} completed`;
 
     const truthIntros = intros.filter(i => i.code && i.code.startsWith('truth_'));
     const truthAnswered = truthIntros.filter(i => i.response && i.response.trim()).length;
@@ -1254,10 +1245,6 @@ function renderIntroductions(intros, progress, acknowledged) {
     // Introduction Section
     html += `
         <section class="intro-section" data-section="intro">
-            <header class="section-header">
-                <h3>Introduction</h3>
-                <div class="section-progress" data-progress="intro">${answered} / ${total}</div>
-            </header>
             ${!intros.length ? '<p>Introductions will appear here once available.</p>' : renderIntroFields(intros, truthAnswered)}
         </section>
     `;

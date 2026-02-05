@@ -97,16 +97,18 @@ class IntroQuestionBase(BaseModel):
     active: Optional[bool] = None
     question_type: Optional[str] = None
     config: Optional[dict] = None
+    help_text: Optional[str] = None
 
 
 class IntroQuestionCreate(IntroQuestionBase):
     code: str
-    prompt: str = Field(...)
+    prompt: str
     display_order: int = 0
     required: bool = True
     active: bool = True
     question_type: str = "text"
     config: Optional[dict] = None
+    help_text: Optional[str] = None
 
 
 class IntroQuestionUpdate(IntroQuestionBase):
@@ -188,6 +190,7 @@ class SurveyQuestion(BaseModel):
     options: Optional[str] = None
     display_order: int = 0
     required: bool = True
+    help_text: Optional[str] = None
 
 
 class SurveyQuestionCreate(BaseModel):
@@ -196,6 +199,7 @@ class SurveyQuestionCreate(BaseModel):
     options: Optional[str] = None
     display_order: int = 0
     required: bool = True
+    help_text: Optional[str] = None
 
 
 class SurveySubmission(BaseModel):

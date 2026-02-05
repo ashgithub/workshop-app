@@ -14,7 +14,7 @@ def list_templates(active_only: bool = True) -> List[dict]:
     ORDER BY NAME
     """
     where_clause = "WHERE ACTIVE = 'Y'" if active_only else ""
-    rows = db.execute_query(query.format(where_clause=where_clause))
+    rows = db.execute_query(query.format(where_clause=where_clause)) or []
     return [
         {
             "id": row[0],
@@ -30,13 +30,13 @@ def list_templates(active_only: bool = True) -> List[dict]:
 def list_questions(template_id: int) -> List[dict]:
     rows = db.execute_query(
         """
-        SELECT ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED
+        SELECT ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED, HELP_TEXT
         FROM SURVEY_QUESTIONS
         WHERE TEMPLATE_ID = :template_id
         ORDER BY DISPLAY_ORDER
         """,
         {"template_id": template_id},
-    )
+    ) or []
     return [
         {
             "id": row[0],
@@ -45,6 +45,7 @@ def list_questions(template_id: int) -> List[dict]:
             "options": row[3],
             "display_order": row[4],
             "required": row[5] == 'Y',
+            "help_text": row[6],
         }
         for row in rows
     ]
@@ -95,7 +96,7 @@ def get_submission(attendee_id: int, template_id: int) -> Optional[dict]:
         WHERE SUBMISSION_ID = :submission_id
         """,
         {"submission_id": submission[0]},
-    )
+    ) or []
     return {
         "submission_id": submission[0],
         "submitted_at": submission[1].isoformat() if submission[1] else None,

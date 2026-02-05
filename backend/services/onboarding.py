@@ -40,7 +40,7 @@ def list_questions(include_inactive: bool = False) -> List[dict]:
     filters = "" if include_inactive else "WHERE ACTIVE = 'Y'"
     rows = db.execute_query(
         f"""
-        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG
+        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG, HELP_TEXT
         FROM ONBOARDING_QUESTIONS
         {filters}
         ORDER BY DISPLAY_ORDER, ID
@@ -57,6 +57,7 @@ def list_questions(include_inactive: bool = False) -> List[dict]:
             "active": row[5] == 'Y',
             "question_type": row[6],
             "config": _parse_config(row[7]),
+            "help_text": row[8],
         }
         for row in rows
     ]
@@ -65,7 +66,7 @@ def list_questions(include_inactive: bool = False) -> List[dict]:
 def get_question(question_id: int) -> Optional[dict]:
     row = db.fetch_one(
         """
-        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG
+        SELECT ID, CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG, HELP_TEXT
         FROM ONBOARDING_QUESTIONS
         WHERE ID = :question_id
         """,
@@ -84,13 +85,14 @@ def get_question(question_id: int) -> Optional[dict]:
         "active": row[5] == 'Y',
         "question_type": row[6],
         "config": _parse_config(row[7]),
+        "help_text": row[8],
     }
 
 
 def create_question(payload: dict) -> int:
     query = """
-        INSERT INTO ONBOARDING_QUESTIONS (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG)
-        VALUES (:code, :prompt, :display_order, :required, :active, :question_type, :config)
+        INSERT INTO ONBOARDING_QUESTIONS (CODE, PROMPT, DISPLAY_ORDER, REQUIRED, ACTIVE, QUESTION_TYPE, CONFIG, HELP_TEXT)
+        VALUES (:code, :prompt, :display_order, :required, :active, :question_type, :config, :help_text)
         RETURNING ID INTO :out_id
     """
     params = {
@@ -101,6 +103,7 @@ def create_question(payload: dict) -> int:
         "active": 'Y' if payload.get("active", True) else 'N',
         "question_type": payload.get("question_type", "text"),
         "config": json.dumps(payload.get("config")) if payload.get("config") is not None else None,
+        "help_text": payload.get("help_text"),
     }
     return db.execute_returning(query, params)
 
@@ -130,6 +133,9 @@ def update_question(question_id: int, payload: dict) -> None:
     if "config" in payload:
         fields.append("CONFIG = :config")
         params["config"] = json.dumps(payload["config"]) if payload["config"] is not None else None
+    if "help_text" in payload:
+        fields.append("HELP_TEXT = :help_text")
+        params["help_text"] = payload["help_text"]
 
     if not fields:
         return
@@ -160,7 +166,7 @@ def reorder_questions(order_map: Iterable[dict]) -> None:
 def list_attendee_responses(attendee_id: int) -> List[dict]:
     rows = db.execute_query(
         """
-        SELECT q.ID, q.PROMPT, q.CODE, q.DISPLAY_ORDER, q.REQUIRED, q.QUESTION_TYPE, q.CONFIG,
+        SELECT q.ID, q.PROMPT, q.CODE, q.DISPLAY_ORDER, q.REQUIRED, q.QUESTION_TYPE, q.CONFIG, q.HELP_TEXT,
                r.ID, r.RESPONSE, r.UPDATED_AT
         FROM ONBOARDING_QUESTIONS q
         LEFT JOIN ATTENDEE_ONBOARDING_RESPONSES r
@@ -182,9 +188,10 @@ def list_attendee_responses(attendee_id: int) -> List[dict]:
                 "required": row[4] == 'Y',
                 "question_type": row[5],
                 "config": _parse_config(row[6]),
-                "response_id": row[7],
-                "response": _normalize_lob(row[8]),
-                "updated_at": row[9].isoformat() if row[9] else None,
+                "help_text": row[7],
+                "response_id": row[8],
+                "response": _normalize_lob(row[9]),
+                "updated_at": row[10].isoformat() if row[10] else None,
             }
         )
     return responses
