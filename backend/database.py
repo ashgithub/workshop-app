@@ -372,7 +372,7 @@ class DatabaseConnection:
                     "end_dt": "2026-03-27",
                     "start_time": "2026-03-23 09:00",
                     "end_time": "2026-03-23 17:00",
-                    "agenda": "images/agenda/agenda-mdc.png",
+                    "agenda": "static/images/agenda/agenda-mdc.png",
                 },
             )
             print("✓ Cohorts seeded")
