@@ -6,7 +6,6 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -59,13 +58,12 @@ async def lifespan(app: FastAPI):
     print("Shutting down AI Workshop Companion API...")
 
 
-# Create FastAPI app with conditional root_path for proxy support
+# Create FastAPI app without root_path (proxy strips the prefix)
 app = FastAPI(
     title="AI Workshop Companion API",
     description="API for workshop attendee management system",
     version="1.0.0",
     debug=config.debug,
-    root_path=config.proxy_prefix if config.proxy_enabled else "",
     lifespan=lifespan
 )
 
@@ -79,10 +77,7 @@ app.add_middleware(
 )
 
 
-# ============================================================================
-# API ENDPOINTS - Define these FIRST
-# ============================================================================
-
+# API ENDPOINTS
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
@@ -121,31 +116,16 @@ app.include_router(onboarding_router_module.router, prefix="/api")
 app.include_router(surveys_router_module.router, prefix="/api")
 
 
-# ============================================================================
-# STATIC FILES MOUNT - Must come before root redirect and frontend mount
-# ============================================================================
-
+# Mount static files
 static_path = Path(config.static_dir)
 static_path.mkdir(exist_ok=True)
+print(f"Mounting /static from {static_path}")
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-
-# ============================================================================
-# ROOT REDIRECT - Must come AFTER static mount but BEFORE frontend mount
-# ============================================================================
-
-@app.get("/", include_in_schema=False)
-async def serve_root():
-    """Redirect root to index.html"""
-    return RedirectResponse(url="index.html")
-
-
-# ============================================================================
-# FRONTEND MOUNT - This MUST be LAST as it's a catch-all
-# ============================================================================
-
+# Mount frontend files (catch-all, must be last)
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
+    print(f"Mounting / from {frontend_path}")
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 # Export app for uvicorn
