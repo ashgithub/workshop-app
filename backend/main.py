@@ -6,8 +6,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import cast
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -97,6 +97,20 @@ async def get_page_sections():
     """Get page section configuration."""
     return config.page_sections
 
+
+@app.get("/api/runtime-config")
+async def get_runtime_config():
+    """Expose runtime settings needed by the frontend."""
+    enabled = bool(config.proxy_enabled)
+    base_path = config.proxy_prefix if enabled and config.proxy_prefix else ""
+    bearer_token = config.proxy_bearer_token if enabled and config.proxy_bearer_token else ""
+
+    return {
+        "enabled": enabled,
+        "basePath": base_path,
+        "bearerToken": bearer_token,
+    }
+
 @app.get("/", include_in_schema=False)
 async def serve_root():
     return RedirectResponse(url="index.html")
@@ -117,54 +131,10 @@ static_path = Path(config.static_dir)
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
 
-# Mount frontend files (must be last) with conditional config injection
+# Mount frontend files (must be last)
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
-    # Custom static files handler to inject proxy config
-    class ConfigInjectingStaticFiles(StaticFiles):
-        async def get_response(self, path: str, scope):
-            response = await super().get_response(path, scope)
-            if path.endswith('.html') and hasattr(response, 'body'):
-                print(f"DEBUG: Injecting proxy config for path: {path}")
-
-                # Inject proxy config into HTML
-                # Handle both bytes and memoryview
-                if isinstance(response.body, memoryview):
-                    body_bytes = response.body.tobytes()
-                else:
-                    body_bytes = response.body
-
-                html_content = body_bytes.decode('utf-8')
-                print(f"DEBUG: Original HTML length: {len(html_content)}")
-                print(f"DEBUG: Contains </head>: {'</head>' in html_content}")
-
-                proxy_config_script = f"""
-<script>
-window.PROXY_CONFIG = {{
-    enabled: {str(config.proxy_enabled).lower()},
-    bearerToken: "{config.proxy_bearer_token}",
-    basePath: "{config.proxy_prefix}"
-}};
-</script>
-                """
-                print(f"DEBUG: Config values - enabled: {config.proxy_enabled}, prefix: {config.proxy_prefix}")
-
-                # Inject before closing </head> tag
-                if '</head>' in html_content:
-                    html_content = html_content.replace('</head>', proxy_config_script + '</head>')
-                    print("DEBUG: Injected before </head>")
-                else:
-                    # Fallback: prepend to body content
-                    html_content = proxy_config_script + html_content
-                    print("DEBUG: Prepended to content (no </head> found)")
-
-                response.body = html_content.encode('utf-8')
-                response.headers['content-length'] = str(len(response.body))
-                print(f"DEBUG: Final HTML length: {len(html_content)}")
-                print(f"DEBUG: Contains PROXY_CONFIG: {'window.PROXY_CONFIG' in html_content}")
-            return response
-
-    app.mount("/", ConfigInjectingStaticFiles(directory=str(frontend_path), html=True), name="frontend")
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 # Export app for uvicorn
 __all__ = ["app"]

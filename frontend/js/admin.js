@@ -2,14 +2,46 @@
  * Redwood-themed admin dashboard powered by v2 APIs.
  */
 
-const apiBase = (window.PROXY_CONFIG && window.PROXY_CONFIG.basePath) || '';
+let runtimeConfigPromise;
+let runtimeConfig = {
+    basePath: '',
+    bearerToken: '',
+    enabled: false,
+};
 
-function apiFetch(path, options = {}) {
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    return fetch(`${apiBase}${normalized}`, options);
+function loadRuntimeConfig() {
+    if (!runtimeConfigPromise) {
+        runtimeConfigPromise = fetch('api/runtime-config')
+            .then(response => (response.ok ? response.json() : {}))
+            .catch(() => ({}))
+            .then(data => {
+                runtimeConfig = {
+                    basePath: data.basePath || '',
+                    bearerToken: data.bearerToken || '',
+                    enabled: Boolean(data.enabled),
+                };
+                if (typeof window !== 'undefined') {
+                    window.RUNTIME_CONFIG = runtimeConfig;
+                }
+                return runtimeConfig;
+            });
+    }
+    return runtimeConfigPromise;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+async function apiFetch(path, options = {}) {
+    const config = await loadRuntimeConfig();
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    const url = `${config.basePath || ''}${normalized}`;
+    const headers = new Headers(options.headers || {});
+    if (config.bearerToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${config.bearerToken}`);
+    }
+    return fetch(url, { ...options, headers });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadRuntimeConfig();
     attachTabs();
     loadCohorts();
     loadTemplates();

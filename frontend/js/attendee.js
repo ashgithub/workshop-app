@@ -2,11 +2,42 @@
  * Attendee portal powered by the rebuilt Oracle APIs.
  */
 
-const apiBase = (window.PROXY_CONFIG && window.PROXY_CONFIG.basePath) || '';
+let runtimeConfigPromise;
+let runtimeConfig = {
+    basePath: '',
+    bearerToken: '',
+    enabled: false,
+};
 
-function apiFetch(path, options = {}) {
+function loadRuntimeConfig() {
+    if (!runtimeConfigPromise) {
+        runtimeConfigPromise = fetch('api/runtime-config')
+            .then(response => (response.ok ? response.json() : {}))
+            .catch(() => ({}))
+            .then(data => {
+                runtimeConfig = {
+                    basePath: data.basePath || '',
+                    bearerToken: data.bearerToken || '',
+                    enabled: Boolean(data.enabled),
+                };
+                if (typeof window !== 'undefined') {
+                    window.RUNTIME_CONFIG = runtimeConfig;
+                }
+                return runtimeConfig;
+            });
+    }
+    return runtimeConfigPromise;
+}
+
+async function apiFetch(path, options = {}) {
+    const config = await loadRuntimeConfig();
     const normalized = path.startsWith('/') ? path : `/${path}`;
-    return fetch(`${apiBase}${normalized}`, options);
+    const url = `${config.basePath || ''}${normalized}`;
+    const headers = new Headers(options.headers || {});
+    if (config.bearerToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${config.bearerToken}`);
+    }
+    return fetch(url, { ...options, headers });
 }
 
 function handleAvatarFallback(img) {
@@ -104,7 +135,8 @@ function renderDescriptionWithLink(section) {
     return description;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadRuntimeConfig();
     const attendeeId = getAttendeeId();
     if (!attendeeId) {
         showMessage('Session expired. Please login again.', 'error');
