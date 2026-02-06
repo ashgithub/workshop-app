@@ -4,9 +4,8 @@ Main FastAPI application for AI Workshop Companion system.
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import cast
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,44 +72,17 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# DETAILED DEBUG MIDDLEWARE
-@app.middleware("http")
-async def detailed_log_requests(request: Request, call_next):
-    print("\n" + "="*80)
-    print(f"🔍 INCOMING REQUEST")
-    print("="*80)
-    print(f"Method: {request.method}")
-    print(f"request.url: {request.url}")
-    print(f"request.url.path: {request.url.path}")
-    print(f"request.scope['path']: {request.scope.get('path', 'NOT SET')}")
-    print(f"request.scope['root_path']: {request.scope.get('root_path', 'NOT SET')}")
-    print(f"request.scope['scheme']: {request.scope.get('scheme', 'NOT SET')}")
-    print(f"request.scope['server']: {request.scope.get('server', 'NOT SET')}")
-    print(f"app.root_path: {app.root_path}")
-    
-    # Check what routes exist
-    print(f"\nMounted routes:")
-    for route in app.routes:
-        print(f"  - {route}")
-    
-    print("="*80)
-    
-    response = await call_next(request)
-    
-    print(f"✓ RESPONSE: {response.status_code}")
-    print("="*80 + "\n")
-    
-    return response
+# ============================================================================
+# API ENDPOINTS - Define these FIRST
+# ============================================================================
 
-
-# Define API routes first (before static file mounts)
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
@@ -126,7 +98,6 @@ async def get_page_sections():
     """Get page section configuration."""
     return config.page_sections
 
-
 @app.get("/api/runtime-config")
 async def get_runtime_config():
     """Expose runtime settings needed by the frontend."""
@@ -141,11 +112,6 @@ async def get_runtime_config():
     }
 
 
-@app.get("/", include_in_schema=False)
-async def serve_root():
-    return RedirectResponse(url="index.html")
-
-
 # Include routers
 app.include_router(auth_router_module.router, prefix="/api", tags=["authentication"])
 app.include_router(attendees_router_module.router, prefix="/api")
@@ -155,34 +121,32 @@ app.include_router(onboarding_router_module.router, prefix="/api")
 app.include_router(surveys_router_module.router, prefix="/api")
 
 
-# Mount static files (after API routes to avoid conflicts)
+# ============================================================================
+# STATIC FILES MOUNT - Must come before root redirect and frontend mount
+# ============================================================================
+
 static_path = Path(config.static_dir)
 static_path.mkdir(exist_ok=True)
-
-print(f"\n📁 MOUNTING STATIC FILES:")
-print(f"   Mount point: /static")
-print(f"   Directory: {static_path.absolute()}")
-print(f"   Directory exists: {static_path.exists()}")
-
-# Check for the avatar file
-avatar_path = static_path / "images" / "default-avatar.svg"
-print(f"   Avatar at {avatar_path}: {avatar_path.exists()}")
-
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-# Mount frontend files (must be last)
+
+# ============================================================================
+# ROOT REDIRECT - Must come AFTER static mount but BEFORE frontend mount
+# ============================================================================
+
+@app.get("/", include_in_schema=False)
+async def serve_root():
+    """Redirect root to index.html"""
+    return RedirectResponse(url="index.html")
+
+
+# ============================================================================
+# FRONTEND MOUNT - This MUST be LAST as it's a catch-all
+# ============================================================================
+
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
-    print(f"\n📁 MOUNTING FRONTEND:")
-    print(f"   Mount point: /")
-    print(f"   Directory: {frontend_path.absolute()}")
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
-
-print(f"\n🔧 APP CONFIGURATION:")
-print(f"   app.root_path: {app.root_path}")
-print(f"   Proxy enabled: {config.proxy_enabled}")
-print(f"   Proxy prefix: {config.proxy_prefix}")
-print("")
 
 # Export app for uvicorn
 __all__ = ["app"]
