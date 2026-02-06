@@ -45,7 +45,7 @@ function handleAvatarFallback(img) {
         return;
     }
     img.dataset.fallbackApplied = 'true';
-    img.src = 'static/images/default-avatar.svg';
+    img.src = `${runtimeConfig.basePath}/static/images/default-avatar.svg`;
 }
 
 function getAttendeeId() {
@@ -80,7 +80,7 @@ function showAgenda(imagePath) {
     const modal = document.getElementById('agenda-modal');
     const modalImg = document.getElementById('modal-img');
     if (!modal || !modalImg) return;
-    modalImg.src = imagePath;
+    modalImg.src = imagePath.startsWith('/') ? `${runtimeConfig.basePath}${imagePath}` : imagePath;
     modal.style.display = 'block';
 }
 
@@ -281,7 +281,7 @@ function renderProfile(attendee) {
     if (avatarEl) {
         const imagePath = attendee.profile_image;
         if (imagePath) {
-            avatarEl.src = imagePath;
+            avatarEl.src = imagePath.startsWith('/') ? `${runtimeConfig.basePath}${imagePath}` : imagePath;
         } else {
             avatarEl.src = 'static/images/default-avatar.svg';
         }

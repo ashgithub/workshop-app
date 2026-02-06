@@ -660,7 +660,7 @@ class DatabaseConnection:
                     {
                         "email": "test2@test.org",
                         "full_name": "Casey Morgan",
-                        "profile_image": "static/images/cdefault-avatar.svg",
+                        "profile_image": "static/images/default-avatar.svg",
                     },
                     {
                         "email": "test3@test.org",
