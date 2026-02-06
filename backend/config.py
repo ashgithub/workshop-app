@@ -70,6 +70,8 @@ class Config:
     @property
     def proxy_enabled(self) -> bool:
         value = self._config.get('proxy', {}).get('enabled', os.getenv('PROXY_ENABLED', 'false'))
+        if isinstance(value, str) and ':' in value:
+            value = value.split(':', 1)[0]
         return str(value).lower() == 'true'
 
     @property
