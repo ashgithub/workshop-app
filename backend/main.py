@@ -6,7 +6,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import cast
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,6 +81,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Debug middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"🔍 REQUEST: {request.method} {request.url.path}")
+    print(f"   Root path: {request.scope.get('root_path', 'NONE')}")
+    print(f"   Full URL: {request.url}")
+    response = await call_next(request)
+    print(f"   ✓ RESPONSE: {response.status_code}")
+    return response
+
+
 # Define API routes first (before static file mounts)
 @app.get("/api/health")
 async def health_check():
@@ -111,6 +123,29 @@ async def get_runtime_config():
         "bearerToken": bearer_token,
     }
 
+
+@app.get("/api/debug/static-info")
+async def debug_static_info():
+    """Debug endpoint to check static file configuration."""
+    static_path = Path(config.static_dir)
+    avatar_path = static_path / "images" / "default-avatar.svg"
+    
+    static_files = []
+    if static_path.exists():
+        static_files = [str(f.relative_to(static_path)) for f in static_path.glob("**/*") if f.is_file()]
+    
+    return {
+        "static_dir": str(static_path.absolute()),
+        "static_dir_exists": static_path.exists(),
+        "avatar_path": str(avatar_path.absolute()),
+        "avatar_exists": avatar_path.exists(),
+        "files_in_static": static_files[:20],
+        "proxy_enabled": config.proxy_enabled,
+        "proxy_prefix": config.proxy_prefix,
+        "app_root_path": app.root_path
+    }
+
+
 @app.get("/", include_in_schema=False)
 async def serve_root():
     return RedirectResponse(url="index.html")
@@ -129,11 +164,47 @@ app.include_router(surveys_router_module.router, prefix="/api")
 # Mount static files (after API routes to avoid conflicts)
 static_path = Path(config.static_dir)
 static_path.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=config.static_dir), name="static")
+
+# Log static directory info at startup
+print("\n" + "="*60)
+print("📁 STATIC FILES CONFIGURATION")
+print("="*60)
+print(f"Static directory: {static_path.absolute()}")
+print(f"Directory exists: {static_path.exists()}")
+
+if static_path.exists():
+    files = list(static_path.glob("**/*"))
+    print(f"Total items found: {len(files)}")
+    
+    # Check specifically for default-avatar.svg
+    avatar_path = static_path / "images" / "default-avatar.svg"
+    print(f"\nDefault avatar check:")
+    print(f"  Expected path: {avatar_path}")
+    print(f"  Exists: {avatar_path.exists()}")
+    
+    if avatar_path.exists():
+        print(f"  Size: {avatar_path.stat().st_size} bytes")
+        print(f"  ✓ Avatar file found!")
+    else:
+        print(f"  ✗ Avatar file NOT found!")
+    
+    # List some files
+    print(f"\nSample files in static directory:")
+    for i, f in enumerate(files[:10]):
+        if f.is_file():
+            print(f"  - {f.relative_to(static_path)}")
+else:
+    print("⚠️  Static directory does not exist!")
+
+print(f"\nMounting /static → {static_path}")
+print("="*60 + "\n")
+
+app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 # Mount frontend files (must be last)
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
+    print(f"📁 Frontend directory: {frontend_path.absolute()}")
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 # Export app for uvicorn
