@@ -80,7 +80,7 @@ function showAgenda(imagePath) {
     const modal = document.getElementById('agenda-modal');
     const modalImg = document.getElementById('modal-img');
     if (!modal || !modalImg) return;
-    modalImg.src = imagePath.startsWith('/') ? `${runtimeConfig.basePath}${imagePath}` : imagePath;
+    modalImg.src = `${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
     modal.style.display = 'block';
 }
 
@@ -281,9 +281,9 @@ function renderProfile(attendee) {
     if (avatarEl) {
         const imagePath = attendee.profile_image;
         if (imagePath) {
-            avatarEl.src = imagePath.startsWith('/') ? `${runtimeConfig.basePath}${imagePath}` : imagePath;
+            avatarEl.src = `${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
         } else {
-            avatarEl.src = 'static/images/default-avatar.svg';
+            avatarEl.src = `${runtimeConfig.basePath}/static/images/default-avatar.svg`;
         }
     }
 
