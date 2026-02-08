@@ -10,14 +10,8 @@ LOG_FILE="$LOG_DIR/backend.log"
 
 mkdir -p "$LOG_DIR"
 
-if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
-    source "$PROJECT_ROOT/.venv/bin/activate"
-fi
-
-CMD="uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
-
 echo "Starting backend with nohup..."
-nohup $CMD > "$LOG_FILE" 2>&1 &
+nohup uv run uvicorn backend.main:app --host 0.0.0.0 --port 8080 > "$LOG_FILE" 2>&1 &
 PID=$!
 
 echo "Backend started in background (PID: $PID)"
