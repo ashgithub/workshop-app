@@ -171,6 +171,8 @@ class DatabaseConnection:
                 COHORT_ID NUMBER NOT NULL REFERENCES COHORTS(ID) ON DELETE CASCADE,
                 EMAIL VARCHAR2(255) NOT NULL,
                 FULL_NAME VARCHAR2(255),
+                TITLE VARCHAR2(255),
+                MANAGER VARCHAR2(255),
                 PROFILE_IMAGE VARCHAR2(500),
                 IS_TEST CHAR(1) DEFAULT 'N' CHECK (IS_TEST IN ('Y','N')),
                 ACKNOWLEDGED CHAR(1) DEFAULT 'N' CHECK (ACKNOWLEDGED IN ('Y','N')),
@@ -488,30 +490,14 @@ class DatabaseConnection:
 
         intro_seed = {
             "test1@test.org": {
-                "team_name": "Redwood Rockets",
-                "intro": "I lead the Redwood UI workstream and mentor new attendees.",
-                "truth_1": "I speak four languages.",
-                "truth_2": "I can't ride a bike.",
-                "truth_3": "I design board games.",
-                "device_pref": "M",
-            },
-            "test2@test.org": {
-                "team_name": "Travel Titans",
-                "intro": "I coordinate travel logistics and on-site experiences.",
-                "truth_1": "I've met three astronauts.",
-                "truth_2": "I hate coffee.",
-                "truth_3": "I code during flights.",
-                "device_pref": "P",
-            },
-            "test3@test.org": {
-                "team_name": "AI All-Stars",
-                "intro": "I run daily AI lab sessions for MDC cohorts.",
-                "truth_1": "I paint abstract art.",
-                "truth_2": "I have a twin.",
-                "truth_3": "I'm terrified of heights.",
+                "team_name": "Test Team 1",
+                "intro": "Test attendee profile for MDC demos.",
+                "truth_1": "Test fact one",
+                "truth_2": "Test fact two",
+                "truth_3": "Test fact three",
                 "device_pref": "M",
                 "tshirt_size": "L",
-            },
+            }
         }
 
         for email, responses in intro_seed.items():
@@ -654,17 +640,23 @@ class DatabaseConnection:
                 test_attendees = [
                     {
                         "email": "test1@test.org",
-                        "full_name": "Jordan Rivera",
+                        "full_name": "Test Attendee 1",
+                        "title": "Test Team 1",
+                        "manager": "Test Manager 1",
                         "profile_image": "static/images/default-avatar.svg",
                     },
                     {
                         "email": "test2@test.org",
-                        "full_name": "Casey Morgan",
+                        "full_name": "Test Attendee 2",
+                        "title": "Test Team 2",
+                        "manager": "Test Manager 2",
                         "profile_image": "static/images/default-avatar.svg",
                     },
                     {
                         "email": "test3@test.org",
-                        "full_name": "Taylor Quinn",
+                        "full_name": "Test Attendee 3",
+                        "title": "Test Team 3",
+                        "manager": "Test Manager 3",
                         "profile_image": "static/images/default-avatar.svg",
                     },
                 ]
@@ -672,14 +664,16 @@ class DatabaseConnection:
                 for attendee in test_attendees:
                     attendee_id = self.execute_returning(
                         """
-                        INSERT INTO ATTENDEES (COHORT_ID, EMAIL, FULL_NAME, PROFILE_IMAGE, IS_TEST)
-                        VALUES (:cohort_id, :email, :full_name, :profile_image, 'Y')
+                        INSERT INTO ATTENDEES (COHORT_ID, EMAIL, FULL_NAME, TITLE, MANAGER, PROFILE_IMAGE, IS_TEST)
+                        VALUES (:cohort_id, :email, :full_name, :title, :manager, :profile_image, 'Y')
                         RETURNING ID INTO :out_id
                         """,
                         {
                             "cohort_id": cohort_id,
                             "email": attendee["email"],
                             "full_name": attendee["full_name"],
+                            "title": attendee.get("title"),
+                            "manager": attendee.get("manager"),
                             "profile_image": attendee.get("profile_image"),
                         },
                     )

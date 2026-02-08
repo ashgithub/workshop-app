@@ -255,6 +255,8 @@ function navigateToSection(section) {
 function renderProfile(attendee) {
     const nameEl = document.getElementById('attendee-name');
     const emailEl = document.getElementById('attendee-email');
+    const titleEl = document.getElementById('attendee-title');
+    const managerEl = document.getElementById('attendee-manager');
     const locationEl = document.getElementById('location-details');
     const avatarEl = document.getElementById('profile-img');
     const confirmationEl = document.getElementById('attendance-confirmation');
@@ -262,20 +264,38 @@ function renderProfile(attendee) {
     nameEl.textContent = attendee.full_name || 'AI Workshop Companion';
     emailEl.textContent = attendee.email;
 
+    if (titleEl) {
+        titleEl.textContent = attendee.title ? `Role: ${attendee.title}` : 'Role: Pending';
+        titleEl.style.display = attendee.title ? 'inline-flex' : 'none';
+    }
+
+    if (managerEl) {
+        managerEl.textContent = attendee.manager ? `Manager: ${attendee.manager}` : 'Manager: Pending';
+        managerEl.style.display = attendee.manager ? 'inline-flex' : 'none';
+    }
+
     if (locationEl) {
         const cohort = attendee.cohort || {};
         const dateRange = cohort.start_date
             ? formatDateRange(cohort.start_date, cohort.end_date, cohort.start_time, cohort.end_time)
             : null;
-        const locationLines = [
-            cohort.title ? `<strong>Cohort:</strong> ${cohort.title}` : null,
-            cohort.room ? `<strong>Room:</strong> ${cohort.room}` : null,
-            dateRange ? `<strong>Dates:</strong> ${dateRange}` : null,
-        ].filter(Boolean);
 
-        locationEl.innerHTML = locationLines.length
-            ? `<div class="cohort-meta">${locationLines.map(line => `<p>${line}</p>`).join('')}</div>`
-            : '';
+        const infoLines = [
+            `<strong>Role:</strong> ${attendee.title || 'Pending'}`,
+            `<strong>Manager:</strong> ${attendee.manager || 'Pending'}`,
+        ];
+
+        if (cohort.title) {
+            infoLines.push(`<strong>Cohort:</strong> ${cohort.title}`);
+        }
+        if (cohort.room) {
+            infoLines.push(`<strong>Room:</strong> ${cohort.room}`);
+        }
+        if (dateRange) {
+            infoLines.push(`<strong>Dates:</strong> ${dateRange}`);
+        }
+
+        locationEl.innerHTML = `<div class="cohort-meta">${infoLines.map(line => `<p>${line}</p>`).join('')}</div>`;
     }
 
     if (avatarEl) {
@@ -315,6 +335,11 @@ function renderProfile(attendee) {
         } else {
             viewAgendaBtn.style.display = 'none';
         }
+    }
+
+    const profileNote = document.getElementById('profile-info-note');
+    if (profileNote) {
+        profileNote.innerHTML = '<em>If anything above needs updating, drop a note in the Slack channel.</em>';
     }
 }
 

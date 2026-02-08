@@ -65,7 +65,7 @@ The onboarding system was redesigned from a simple task checklist to a question-
 
 ## Tooling Notes
 - Use `uv run` (or activate `.venv`) for any Python command that imports project modules; direct `python` misses dependencies like `envyaml` and `oracledb`.
-- Migrations (`scripts/migrate.sh`) rely on the same `backend.database` module.
+- Schema initialization relies on `backend.database.DatabaseConnection` (see `initialize_schema()`), so infrastructure scripts should import that helper instead of shelling out to removed bash scripts.
 - **Database Naming**: Avoid using `desc` as a column name - it's a reserved SQL keyword. Use `description` instead.
 - Legacy face images remain in `backend/static/images/cropped_images`; make sure `config.images_dir` points there when serving profile photos.
 

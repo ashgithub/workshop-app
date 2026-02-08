@@ -12,6 +12,7 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
     row = db.fetch_one(
         """
         SELECT a.ID, a.EMAIL, a.FULL_NAME, a.PROFILE_IMAGE, a.ACKNOWLEDGED,
+               a.TITLE, a.MANAGER,
                c.ID, c.TITLE, c.LOCATION_NAME, c.ADDRESS, c.ROOM, c.START_DATE, c.END_DATE,
                c.START_TIME, c.END_TIME, c.AGENDA_URL
         FROM ATTENDEES a
@@ -29,17 +30,19 @@ def get_attendee(attendee_id: int) -> Optional[dict]:
         "full_name": row[2],
         "profile_image": row[3],
         "acknowledged": row[4] == 'Y',
+        "title": row[5],
+        "manager": row[6],
         "cohort": {
-            "id": row[5],
-            "title": row[6],
-            "location_name": row[7],
-            "address": row[8],
-            "room": row[9],
-            "start_date": row[10].isoformat() if row[10] else None,
-            "end_date": row[11].isoformat() if row[11] else None,
-            "start_time": row[12].isoformat() if row[12] else None,
-            "end_time": row[13].isoformat() if row[13] else None,
-            "agenda_url": row[14],
+            "id": row[7],
+            "title": row[8],
+            "location_name": row[9],
+            "address": row[10],
+            "room": row[11],
+            "start_date": row[12].isoformat() if row[12] else None,
+            "end_date": row[13].isoformat() if row[13] else None,
+            "start_time": row[14].isoformat() if row[14] else None,
+            "end_time": row[15].isoformat() if row[15] else None,
+            "agenda_url": row[16],
         },
     }
 
