@@ -36,8 +36,12 @@ def import_attendees() -> None:
 
     with CSV_PATH.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        for row in reader:
-            email = row["email"].strip()
+        for idx, row in enumerate(reader, start=1):
+            email = row.get("email", "").strip()
+            if not email:
+                print(f"✗ Row {idx}: missing email, skipping")
+                continue
+
             name = row.get("name", "").strip() or None
             title = row.get("title", "").strip() or None
             manager = row.get("team_manager", "").strip() or None
@@ -74,6 +78,8 @@ def import_attendees() -> None:
                     "profile_image": profile_image,
                 },
             )
+
+            print(f"✓ Imported {email} (ID: {attendee_id})")
 
             team_name = row.get("team", "").strip()
             if team_question_id and team_name:

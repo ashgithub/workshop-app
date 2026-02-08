@@ -35,18 +35,28 @@ async def lifespan(app: FastAPI):
     if db.test_connection():
         print("Database connection successful")
 
+        def confirm(prompt: str) -> bool:
+            response = input(f"{prompt} (y/N): ").strip().lower()
+            return response == "y"
+
         if config.reset_schema_on_startup:
-            if db.initialize_schema():
-                print("Database schema initialized successfully")
+            if confirm("Reset schema on startup will drop and recreate all tables. Continue?"):
+                if db.initialize_schema():
+                    print("Database schema initialized successfully")
+                else:
+                    print("Database schema initialization failed - exiting")
+                    sys.exit(1)
             else:
-                print("Database schema initialization failed - exiting")
-                sys.exit(1)
+                print("Schema reset skipped by user; continuing with existing schema.")
         elif config.reset_data_on_startup:
-            if db.reset_data():
-                print("Database data reset successfully")
+            if confirm("Reset data on startup will clear all workshop data. Continue?"):
+                if db.reset_data():
+                    print("Database data reset successfully")
+                else:
+                    print("Database data reset failed - exiting")
+                    sys.exit(1)
             else:
-                print("Database data reset failed - exiting")
-                sys.exit(1)
+                print("Data reset skipped by user; continuing with existing data.")
     else:
         print("Warning: Database connection failed - some features may not work")
 

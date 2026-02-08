@@ -326,17 +326,36 @@ class DatabaseConnection:
 
         print("Seeding admin users...")
         try:
-            self.execute_dml(
-                """
-                MERGE INTO ADMIN_USERS t
-                USING (SELECT :email AS EMAIL FROM DUAL) src
-                ON (t.EMAIL = src.EMAIL)
-                WHEN NOT MATCHED THEN
-                    INSERT (EMAIL, FULL_NAME)
-                    VALUES (:email, :full_name)
-                """,
-                {"email": "ashish.ag.agarwal@oracle.com", "full_name": "Primary Admin"},
-            )
+            def _name_from_email(email: str) -> str:
+                local_part = email.split("@", 1)[0]
+                tokens = [token for token in local_part.replace("_", ".").split(".") if token]
+                if not tokens:
+                    return email
+                first = tokens[0].capitalize()
+                last = tokens[-1].capitalize() if len(tokens) > 1 else "Admin"
+                return f"{first} {last}"
+
+            admin_emails = [
+                "ashish.ag.agarwal@oracle.com",
+                "mauricio.capistran@oracle.com",
+                "neeraj.rohilla@oracle.com",
+            ]
+
+            for admin_email in admin_emails:
+                self.execute_dml(
+                    """
+                    MERGE INTO ADMIN_USERS t
+                    USING (SELECT :email AS EMAIL FROM DUAL) src
+                    ON (t.EMAIL = src.EMAIL)
+                    WHEN NOT MATCHED THEN
+                        INSERT (EMAIL, FULL_NAME)
+                        VALUES (:email, :full_name)
+                    WHEN MATCHED THEN
+                        UPDATE SET FULL_NAME = :full_name,
+                                   UPDATED_AT = CURRENT_TIMESTAMP
+                    """,
+                    {"email": admin_email, "full_name": _name_from_email(admin_email)},
+                )
             print("✓ Admin users seeded")
         except Exception as exc:
             print(f"✗ Failed to seed admin users: {exc}")
