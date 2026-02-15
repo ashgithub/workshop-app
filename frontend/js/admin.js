@@ -64,8 +64,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     attachTabs();
     initializeProgressTab();
     loadCohorts();
-    loadTemplates();
-    loadSurveys();
     loadLocations();
     bindDialogs();
 });
@@ -88,9 +86,6 @@ function attachTabs() {
 }
 
 function bindDialogs() {
-    document.getElementById('new-cohort-btn')?.addEventListener('click', openNewCohortDialog);
-    document.getElementById('new-template-btn')?.addEventListener('click', openNewTemplateDialog);
-    document.getElementById('new-survey-btn')?.addEventListener('click', () => alert('Survey builder coming soon.'));
     document.getElementById('query-btn')?.addEventListener('click', runQuery);
     document.getElementById('progress-cohort-select')?.addEventListener('change', handleProgressFilters);
     document.getElementById('include-test-toggle')?.addEventListener('change', handleProgressFilters);
@@ -151,40 +146,14 @@ async function loadCohorts() {
             throw new Error(await response.text());
         }
         const cohorts = await response.json();
-        renderCohorts(cohorts);
         renderProgressCohortOptions(cohorts);
     } catch (error) {
         console.error('Failed to load cohorts', error);
-        document.getElementById('cohort-grid').innerHTML = '<p>Unable to load cohorts.</p>';
         renderProgressError('Unable to load cohorts.');
     }
 }
 
-function renderCohorts(cohorts) {
-    const grid = document.getElementById('cohort-grid');
-    if (!grid) return;
-    if (!cohorts.length) {
-        grid.innerHTML = '<p>No cohorts yet. Create one to get started.</p>';
-        return;
-    }
-    grid.innerHTML = cohorts
-        .map(cohort => `
-            <article class="cohort-card">
-                <header>
-                    <h3>${cohort.title}</h3>
-                    <span class="badge">${cohort.cohort_code}</span>
-                </header>
-                <p>${cohort.location_name || 'Location TBA'}</p>
-                ${cohort.start_date ? `<p>${formatDateRange(cohort.start_date, cohort.end_date)}</p>` : ''}
-                <button class="btn-secondary" data-cohort="${cohort.id}">Invite attendee</button>
-            </article>
-        `)
-        .join('');
 
-    grid.querySelectorAll('[data-cohort]').forEach(btn => {
-        btn.addEventListener('click', () => openInviteDialog(btn.getAttribute('data-cohort')));
-    });
-}
 
 function renderProgressCohortOptions(cohorts) {
     const select = document.getElementById('progress-cohort-select');
@@ -724,108 +693,9 @@ function destroyChart(canvasId) {
     }
 }
 
-function formatDateRange(startDate, endDate) {
-    if (!startDate) return '';
-    const start = new Date(startDate);
-    if (!Number.isFinite(start.getTime())) return startDate;
-    if (!endDate) {
-        return start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    const end = new Date(endDate);
-    if (!Number.isFinite(end.getTime())) {
-        return start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
-}
 
-function openNewCohortDialog() {
-    const title = prompt('Cohort title (e.g., MDC March 2026)');
-    if (!title) return;
-    const cohort_code = prompt('Cohort code (e.g., MDC2026)');
-    if (!cohort_code) return;
-    apiFetch('/api/cohorts/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cohort_code, title, location_name: 'MDC', address: 'MDC Mexico', room: 'TBD' }),
-    })
-        .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
-        .then(() => loadCohorts())
-        .catch(err => {
-            console.error('Create cohort failed', err);
-            alert('Unable to create cohort');
-        });
-}
 
-function openNewTemplateDialog() {
-    const name = prompt('Template name (e.g., Basic Onboarding Checklist)');
-    if (!name) return;
-    const description = prompt('Template description (optional)');
-    alert('Template creation functionality is not yet implemented.');
-    // TODO: Implement template creation API call
-}
 
-function openInviteDialog(cohortId) {
-    const email = prompt('Attendee email');
-    if (!email) return;
-    const full_name = prompt('Attendee full name (optional)');
-
-    apiFetch(`/api/cohorts/${cohortId}/attendees`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, full_name }),
-    })
-        .then(res => res.ok ? res.json() : Promise.reject(res.statusText))
-        .then(data => {
-            if (data.status === 'existing') {
-                alert('Attendee already exists in this cohort');
-            } else {
-                alert('Attendee invited and checklist generated');
-            }
-        })
-        .catch(err => {
-            console.error('Invite failed', err);
-            alert('Unable to invite attendee');
-        });
-}
-
-async function loadTemplates() {
-    try {
-        const response = await apiFetch('/api/tasks/templates');
-        if (!response.ok) {
-            throw new Error(await response.text());
-        }
-        const templates = await response.json();
-        renderTemplates(templates);
-    } catch (error) {
-        console.error('Failed to load templates', error);
-        document.getElementById('template-list').innerHTML = '<p>Unable to load templates.</p>';
-    }
-}
-
-async function loadSurveys() {
-    try {
-        const response = await apiFetch('/api/surveys/templates');
-        if (!response.ok) {
-            throw new Error(await response.text());
-        }
-        const surveys = await response.json();
-        const list = document.getElementById('survey-list');
-        list.innerHTML = surveys
-            .map(survey => `
-                <div class="survey-card">
-                    <div class="survey-card-header">
-                        <h4>${survey.name}</h4>
-                        <span class="badge ${survey.active ? 'complete' : 'pending'}">${survey.active ? 'Active' : 'Inactive'}</span>
-                    </div>
-                    <p>${survey.description || 'No description provided.'}</p>
-                </div>
-            `)
-            .join('');
-    } catch (error) {
-        console.error('Failed to load surveys', error);
-        document.getElementById('survey-list').innerHTML = '<p>Unable to load surveys.</p>';
-    }
-}
 
 async function loadLocations() {
     try {
@@ -847,31 +717,6 @@ async function loadLocations() {
     } catch (error) {
         console.error('Failed to load locations', error);
     }
-}
-
-function renderTemplates(templates) {
-    const list = document.getElementById('template-list');
-    if (!list) return;
-
-    if (!templates || !templates.length) {
-        list.innerHTML = '<p>No templates yet. Create one to get started.</p>';
-        return;
-    }
-
-    list.innerHTML = templates
-        .map(template => `
-            <article class="template-card">
-                <header>
-                    <h3>${template.name}</h3>
-                    <span class="badge ${template.active ? 'complete' : 'pending'}">${template.active ? 'Active' : 'Inactive'}</span>
-                </header>
-                <p>${template.description || 'No description provided.'}</p>
-                <div class="template-meta">
-                    <span>${template.tasks?.length || 0} tasks</span>
-                </div>
-            </article>
-        `)
-        .join('');
 }
 
 // Game and query functions (placeholders)
