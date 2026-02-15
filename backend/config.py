@@ -95,10 +95,6 @@ class Config:
         return self._config.get('admin', {}).get('shared_password', os.getenv('ADMIN_SHARED_PASSWORD', 'change-me'))
 
     @property
-    def ignore_test_users(self) -> bool:
-        value = self._config.get('admin', {}).get('ignore_test_users', os.getenv('IGNORE_TEST_USERS', 'true'))
-        return str(value).lower() != 'false'
-
     @property
     def reset_schema_on_startup(self) -> bool:
         value = self._config.get('app', {}).get('reset_schema_on_startup', os.getenv('RESET_SCHEMA_ON_STARTUP', 'false'))

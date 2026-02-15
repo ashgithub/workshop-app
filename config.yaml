@@ -18,6 +18,9 @@ proxy:
   prefix: $PROXY_PREFIX:/workshop-app
   bearer_token: $PROXY_BEARER_TOKEN
 
+admin:
+  shared_password: $ADMIN_SHARED_PASSWORD:change-me-admin
+
 page_sections:
   intro:
     title: "Introductions"
