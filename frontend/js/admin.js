@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     attachTabs();
     initializeProgressTab();
     loadCohorts();
-    loadLocations();
+    loadGameCohorts();
     bindDialogs();
 });
 
@@ -93,7 +93,7 @@ function bindDialogs() {
     // Game-related event handlers
     document.getElementById('start-game-btn')?.addEventListener('click', startGame);
     document.getElementById('reset-game-btn')?.addEventListener('click', resetGame);
-    document.getElementById('location-select')?.addEventListener('change', updateGameProgress);
+    document.getElementById('cohort-select')?.addEventListener('change', handleGameCohortChange);
 }
 
 function initializeProgressTab() {
@@ -153,6 +153,19 @@ async function loadCohorts() {
     }
 }
 
+async function loadGameCohorts() {
+    try {
+        const response = await apiFetch('/api/cohorts/');
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+        const cohorts = await response.json();
+        renderGameCohortOptions(cohorts);
+    } catch (error) {
+        console.error('Failed to load cohorts for game', error);
+    }
+}
+
 
 
 function renderProgressCohortOptions(cohorts) {
@@ -187,6 +200,36 @@ function renderProgressCohortOptions(cohorts) {
         loadDashboard();
     } else {
         renderProgressEmptyState();
+    }
+}
+
+function renderGameCohortOptions(cohorts) {
+    const select = document.getElementById('cohort-select');
+    if (!select) return;
+    const previous = recall('adminGameCohort');
+    select.innerHTML = '<option value="">Select Cohort</option>';
+    cohorts.forEach(cohort => {
+        const option = document.createElement('option');
+        option.value = String(cohort.id);
+        option.textContent = cohort.title;
+        select.appendChild(option);
+    });
+
+    let selectedCohort = null;
+
+    // Auto-select if there's exactly one cohort
+    if (cohorts.length === 1) {
+        selectedCohort = String(cohorts[0].id);
+    }
+    // Otherwise, restore previous selection if it still exists
+    else if (previous && cohorts.some(c => String(c.id) === previous)) {
+        selectedCohort = previous;
+    }
+
+    if (selectedCohort) {
+        select.value = selectedCohort;
+        remember('adminGameCohort', selectedCohort);
+        updateGameProgress();
     }
 }
 
@@ -721,29 +764,37 @@ async function loadLocations() {
 
 // Game and query functions (placeholders)
 function startGame() {
-    const locationSelect = document.getElementById('location-select');
-    if (!locationSelect || !locationSelect.value) {
-        alert('Please select a location first.');
+    const cohortSelect = document.getElementById('cohort-select');
+    if (!cohortSelect || !cohortSelect.value) {
+        alert('Please select a cohort first.');
         return;
     }
     alert('Game functionality is not currently implemented.');
 }
 
 function resetGame() {
-    const locationSelect = document.getElementById('location-select');
-    if (!locationSelect || !locationSelect.value) {
-        alert('Please select a location first.');
+    const cohortSelect = document.getElementById('cohort-select');
+    if (!cohortSelect || !cohortSelect.value) {
+        alert('Please select a cohort first.');
         return;
     }
     alert('Game reset functionality is not currently implemented.');
 }
 
+function handleGameCohortChange() {
+    const cohortSelect = document.getElementById('cohort-select');
+    if (cohortSelect) {
+        remember('adminGameCohort', cohortSelect.value);
+        updateGameProgress();
+    }
+}
+
 function updateGameProgress() {
-    // Update game progress display when location changes
-    const locationSelect = document.getElementById('location-select');
+    // Update game progress display when cohort changes
+    const cohortSelect = document.getElementById('cohort-select');
     const gameProgress = document.getElementById('game-progress');
     if (gameProgress) {
-        gameProgress.style.display = locationSelect && locationSelect.value ? 'inline' : 'none';
+        gameProgress.style.display = cohortSelect && cohortSelect.value ? 'inline' : 'none';
     }
 }
 
