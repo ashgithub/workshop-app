@@ -133,6 +133,8 @@ function handleProgressFilters() {
 
     remember('adminIncludeTest', includeToggle.checked);
 
+    // Cohort selection changed - load dashboard
+
     if (!cohortSelect.value) {
         renderProgressEmptyState();
         return;
@@ -195,10 +197,24 @@ function renderProgressCohortOptions(cohorts) {
         option.textContent = cohort.title;
         select.appendChild(option);
     });
-    if (previous && cohorts.some(c => String(c.id) === previous)) {
-        select.value = previous;
+
+    // Debug logs removed for production
+
+    let selectedCohort = null;
+
+    // Auto-select if there's exactly one cohort
+    if (cohorts.length === 1) {
+        selectedCohort = String(cohorts[0].id);
+    }
+    // Otherwise, restore previous selection if it still exists
+    else if (previous && cohorts.some(c => String(c.id) === previous)) {
+        selectedCohort = previous;
+    }
+
+    if (selectedCohort) {
+        select.value = selectedCohort;
         select.dataset.pendingSelection = '';
-        remember('adminProgressCohort', previous);
+        remember('adminProgressCohort', selectedCohort);
         loadDashboard();
     } else {
         renderProgressEmptyState();
@@ -256,6 +272,7 @@ function renderProgressDashboard(data) {
     const shell = document.getElementById('progress-content');
     if (!shell) return;
 
+    // Show loading state while charts are being rendered
     shell.innerHTML = `
         <section class="headline-strip" aria-label="Cohort summary">
             <div class="headline-card">
@@ -268,60 +285,117 @@ function renderProgressDashboard(data) {
             </div>
         </section>
         <section class="chart-grid" aria-label="Progress charts">
-            <article class="chart-card" aria-label="Introductions completion">
-                <header>
-                    <h3>Introductions</h3>
-                    <p>${formatCompletionSummary(data.intro.questions)}</p>
-                </header>
-                <canvas id="intro-completion-chart" aria-label="Introduction completion chart"></canvas>
-            </article>
-            <article class="chart-card" aria-label="Truth prompt completion">
-                <header>
-                    <h3>Two Truths & One Lie</h3>
-                    <p>${formatTruthSummary(data.intro.questions)}</p>
-                </header>
-                <div class="small-chart-grid">
-                    <canvas id="truth-1-chart" aria-label="Truth 1 completion"></canvas>
-                    <canvas id="truth-2-chart" aria-label="Truth 2 completion"></canvas>
-                    <canvas id="truth-3-chart" aria-label="Truth 3 completion"></canvas>
-                </div>
-            </article>
-            <article class="chart-card" aria-label="Device preference breakdown">
-                <header>
-                    <h3>Device preference</h3>
-                    <p>${formatChoiceSummary(data.intro.device_pref)}</p>
-                </header>
-                <canvas id="device-pref-chart" aria-label="Device preference donut"></canvas>
-            </article>
-            <article class="chart-card" aria-label="T-shirt size breakdown">
-                <header>
-                    <h3>T-shirt sizes</h3>
-                    <p>${formatChoiceSummary(data.intro.tshirt_size)}</p>
-                </header>
-                <canvas id="tshirt-size-chart" aria-label="T-shirt size donut"></canvas>
-            </article>
-            <article class="chart-card" aria-label="Onboarding checklist">
-                <header>
-                    <h3>Onboarding checklist</h3>
-                    <p>${formatCompletionSummary(data.onboarding)}</p>
-                </header>
-                <canvas id="onboarding-step-chart" aria-label="Onboarding steps completion"></canvas>
-            </article>
-            <article class="chart-card" aria-label="Survey submissions">
-                <header>
-                    <h3>Survey submissions</h3>
-                    <p>${formatSurveySummary(data.surveys)}</p>
-                </header>
-                <canvas id="survey-completion-chart" aria-label="Survey submission counts"></canvas>
-            </article>
+            <div class="chart-loading">Loading charts...</div>
         </section>
     `;
 
+    // Use setTimeout to allow DOM to update before rendering charts
+    setTimeout(() => {
+        try {
+            renderCharts(data);
+        } catch (error) {
+            console.error('Failed to render charts:', error);
+            renderProgressError('Failed to render dashboard charts.');
+        }
+    }, 10);
+}
+
+function renderCharts(data) {
+    const shell = document.getElementById('progress-content');
+    if (!shell) return;
+
+    shell.innerHTML = `
+        <section class="headline-strip" aria-label="Cohort summary">
+            <div class="headline-card">
+                <p class="headline-label">Total attendees</p>
+                <p class="headline-value">${data.headline.attendees_total}</p>
+            </div>
+            <div class="headline-card">
+                <p class="headline-label">Accepted attendees</p>
+                <p class="headline-value">${data.headline.attendees_accepted}</p>
+            </div>
+        </section>
+
+        <div class="chart-tabs">
+            <div class="chart-tab-buttons">
+                <button class="chart-tab-btn active" data-chart-tab="intro">Introduction</button>
+                <button class="chart-tab-btn" data-chart-tab="onboarding">Onboarding</button>
+                <button class="chart-tab-btn" data-chart-tab="surveys">Surveys</button>
+            </div>
+
+            <div class="chart-tab-content active" id="intro-chart-tab">
+                <section class="chart-grid" aria-label="Introduction charts">
+                    <article class="chart-card" aria-label="Introductions completion">
+                        <header>
+                            <h3>Introduction Questions</h3>
+                            <p>${formatCompletionSummary(data.intro.questions)}</p>
+                        </header>
+                        <div id="intro-completion-chart" class="simple-chart-container"></div>
+                    </article>
+                    <article class="chart-card" aria-label="Truth prompt completion">
+                        <header>
+                            <h3>Two Truths & One Lie</h3>
+                            <p>${formatTruthSummary(data.intro.questions)}</p>
+                        </header>
+                        <div id="truth-summary-chart" class="simple-chart-container"></div>
+                    </article>
+                </section>
+            </div>
+
+            <div class="chart-tab-content" id="onboarding-chart-tab">
+                <section class="chart-grid" aria-label="Onboarding charts">
+                    <article class="chart-card" aria-label="Onboarding checklist">
+                        <header>
+                            <h3>Onboarding Checklist</h3>
+                            <p>${formatCompletionSummary(data.onboarding)}</p>
+                        </header>
+                        <div id="onboarding-step-chart" class="simple-chart-container"></div>
+                    </article>
+                </section>
+            </div>
+
+            <div class="chart-tab-content" id="surveys-chart-tab">
+                <section class="chart-grid" aria-label="Survey charts">
+                    <article class="chart-card" aria-label="Survey submissions">
+                        <header>
+                            <h3>Survey Submissions</h3>
+                            <p>${formatSurveySummary(data.surveys)}</p>
+                        </header>
+                        <div id="survey-completion-chart" class="simple-chart-container"></div>
+                    </article>
+                </section>
+            </div>
+        </div>
+    `;
+
+    // Attach chart tab event listeners
+    attachChartTabListeners();
+
+    // Render charts for each tab
     renderIntroCharts(data.intro);
-    renderChoiceChart('device-pref-chart', data.intro.device_pref);
-    renderChoiceChart('tshirt-size-chart', data.intro.tshirt_size);
     renderOnboardingChart(data.onboarding);
     renderSurveyChart(data.surveys);
+}
+
+function attachChartTabListeners() {
+    const tabButtons = document.querySelectorAll('.chart-tab-btn');
+    const tabContents = document.querySelectorAll('.chart-tab-content');
+
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.getAttribute('data-chart-tab');
+
+            // Update active button
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update active content
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-chart-tab`)?.classList.add('active');
+        });
+    });
 }
 
 function formatCompletionSummary(items) {
@@ -362,31 +436,128 @@ function formatSurveySummary(items) {
 
 function renderIntroCharts(intro) {
     if (!intro) return;
-    const truthCodes = ['truth_1', 'truth_2', 'truth_3'];
-    const truthCharts = ['truth-1-chart', 'truth-2-chart', 'truth-3-chart'];
 
-    const textQuestions = (intro.questions || []).filter(q => !['device_pref', 'tshirt_size'].includes(q.code));
-    renderStackedBar('intro-completion-chart', textQuestions, {
-        grouped: true,
-        labelKey: 'label'
-    });
+    const allQuestions = intro.questions || [];
 
-    truthCodes.forEach((code, index) => {
-        const question = textQuestions.find(item => item.code === code);
-        if (!question) {
-            destroyChart(truthCharts[index]);
-            const canvas = document.getElementById(truthCharts[index]);
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-            return;
+    // Include device_pref and tshirt_size choice questions in the main list
+    const choiceQuestions = [];
+    if (intro.device_pref) {
+        choiceQuestions.push(intro.device_pref);
+    }
+    if (intro.tshirt_size) {
+        choiceQuestions.push(intro.tshirt_size);
+    }
+
+    // Combine all questions, then separate truth questions from other intro questions
+    const combinedQuestions = [...allQuestions, ...choiceQuestions];
+    const truthQuestions = combinedQuestions.filter(q => q.code && q.code.startsWith('truth_'));
+    const otherIntroQuestions = combinedQuestions.filter(q => !q.code || !q.code.startsWith('truth_'));
+
+    // Render main introduction completion chart (excluding truth questions)
+    renderSimpleProgressChart('intro-completion-chart', otherIntroQuestions);
+
+    // Render consolidated Two Truths & One Lie summary
+    if (truthQuestions.length > 0) {
+        // Create a summary item for all truth questions combined
+        const totalCompleted = truthQuestions.reduce((sum, q) => sum + (q.completed || 0), 0);
+        const totalTotal = truthQuestions.reduce((sum, q) => sum + (q.total || 0), 0);
+        const summaryItem = {
+            label: 'Two Truths & One Lie (All Prompts)',
+            completed: totalCompleted,
+            total: totalTotal
+        };
+        renderSimpleProgressChart('truth-summary-chart', [summaryItem]);
+    } else {
+        const container = document.getElementById('truth-summary-chart');
+        if (container) container.innerHTML = '<p>No truth prompts configured.</p>';
+    }
+}
+
+// Simple progress chart renderer - no Chart.js dependency
+function renderSimpleProgressChart(containerId, items) {
+    const container = document.getElementById(containerId);
+    if (!container || !Array.isArray(items) || !items.length) {
+        if (container) container.innerHTML = '';
+        return;
+    }
+
+    const html = items.map(item => {
+        // Check if this is a choice question with breakdown data
+        if (item.breakdown && Array.isArray(item.breakdown) && item.breakdown.length > 0) {
+            // Render choice breakdown
+            const choiceHtml = item.breakdown.map(choice => {
+                const count = choice.count || 0;
+                const total = item.completed || item.breakdown.reduce((sum, c) => sum + (c.count || 0), 0);
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                const label = choice.label || choice.value || 'Unknown';
+
+                return `
+                    <div class="choice-breakdown-item">
+                        <div class="choice-breakdown-label">${label}</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="progress-stats">${count}/${total} (${percentage}%)</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="progress-item choice-question">
+                    <div class="progress-label">${item.label || item.code || 'Unknown'}</div>
+                    <div class="choice-breakdown-container">
+                        ${choiceHtml}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Render simple progress bar for text questions
+            const completed = item.completed || 0;
+            const total = item.total || 1;
+            const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const label = item.label || item.code || 'Unknown';
+
+            return `
+                <div class="progress-item">
+                    <div class="progress-label">${label}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="progress-stats">${completed}/${total} (${percentage}%)</div>
+                </div>
+            `;
         }
-        renderStackedBar(truthCharts[index], [question], {
-            grouped: false,
-            labelKey: 'label'
-        });
-    });
+    }).join('');
+
+    container.innerHTML = html;
+}
+
+// Simple choice breakdown renderer for device preferences and t-shirt sizes
+function renderChoiceBreakdown(containerId, data) {
+    const container = document.getElementById(containerId);
+    if (!container || !data || !Array.isArray(data.breakdown) || !data.breakdown.length) {
+        if (container) container.innerHTML = '<p>No responses yet.</p>';
+        return;
+    }
+
+    const total = data.total || data.breakdown.reduce((sum, item) => sum + (item.count || 0), 0);
+    const html = data.breakdown.map(item => {
+        const count = item.count || 0;
+        const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+        const label = item.label || item.value || 'Unknown';
+
+        return `
+            <div class="choice-item">
+                <div class="choice-label">${label}</div>
+                <div class="choice-bar-container">
+                    <div class="choice-bar-fill" style="width: ${percentage}%"></div>
+                </div>
+                <div class="choice-stats">${count} (${percentage}%)</div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
 }
 
 function renderStackedBar(canvasId, items, options = {}) {
@@ -433,6 +604,12 @@ function renderStackedBar(canvasId, items, options = {}) {
                 y: {
                     stacked: true,
                     beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        callback: function(value) {
+                            return Number.isInteger(value) ? value : '';
+                        }
+                    }
                 },
             },
             plugins: {
@@ -480,52 +657,34 @@ function renderChoiceChart(canvasId, data) {
 }
 
 function renderOnboardingChart(items) {
-    renderStackedBar('onboarding-step-chart', items, { grouped: false, labelKey: 'label' });
+    renderSimpleProgressChart('onboarding-step-chart', items);
 }
 
 function renderSurveyChart(items) {
-    const canvasId = 'survey-completion-chart';
-    const canvas = document.getElementById(canvasId);
-    if (!canvas || !Array.isArray(items) || !items.length) {
-        destroyChart(canvasId);
+    const container = document.getElementById('survey-completion-chart');
+    if (!container || !Array.isArray(items) || !items.length) {
+        if (container) container.innerHTML = '';
         return;
     }
 
-    createChart(canvasId, {
-        type: 'bar',
-        data: {
-            labels: items.map(item => item.name),
-            datasets: [
-                {
-                    label: 'Submissions',
-                    data: items.map(item => item.completed || 0),
-                    backgroundColor: 'rgba(79, 70, 229, 0.75)',
-                    borderRadius: 6,
-                },
-                {
-                    label: 'Target',
-                    data: items.map(item => item.expected || 0),
-                    type: 'line',
-                    borderColor: 'rgba(148, 163, 184, 0.9)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0,
-                },
-            ],
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                },
-            },
-            scales: {
-                y: { beginAtZero: true },
-            },
-        },
-    });
+    const html = items.map(item => {
+        const completed = item.completed || 0;
+        const expected = item.expected || 1;
+        const percentage = expected > 0 ? Math.round((completed / expected) * 100) : 0;
+        const name = item.name || 'Unknown Survey';
+
+        return `
+            <div class="progress-item">
+                <div class="progress-label">${name}</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                </div>
+                <div class="progress-stats">${completed}/${expected} (${percentage}%)</div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
 }
 
 function generatePalette(length) {
@@ -597,6 +756,14 @@ function openNewCohortDialog() {
         });
 }
 
+function openNewTemplateDialog() {
+    const name = prompt('Template name (e.g., Basic Onboarding Checklist)');
+    if (!name) return;
+    const description = prompt('Template description (optional)');
+    alert('Template creation functionality is not yet implemented.');
+    // TODO: Implement template creation API call
+}
+
 function openInviteDialog(cohortId) {
     const email = prompt('Attendee email');
     if (!email) return;
@@ -619,27 +786,6 @@ function openInviteDialog(cohortId) {
             console.error('Invite failed', err);
             alert('Unable to invite attendee');
         });
-}
-
-async function loadDashboard() {
-    const cohortSelect = document.getElementById('progress-cohort-select');
-    const includeToggle = document.getElementById('include-test-toggle');
-    if (!cohortSelect || !cohortSelect.value) return;
-
-    const cohortId = cohortSelect.value;
-    const includeTest = includeToggle?.checked || false;
-
-    try {
-        const response = await apiFetch(`/api/admin/dashboard?cohort_id=${cohortId}&include_test=${includeTest}`);
-        if (!response.ok) {
-            throw new Error(await response.text());
-        }
-        const data = await response.json();
-        renderProgressDashboard(data);
-    } catch (error) {
-        console.error('Failed to load dashboard', error);
-        renderProgressError('Unable to load dashboard metrics.');
-    }
 }
 
 async function loadTemplates() {
@@ -681,7 +827,100 @@ async function loadSurveys() {
     }
 }
 
-// Remaining game, query, and onboarding helper functions unchanged...
+async function loadLocations() {
+    try {
+        const response = await apiFetch('/api/admin/locations');
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+        const data = await response.json();
+        const select = document.getElementById('location-select');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select Location</option>';
+        (data.locations || []).forEach(location => {
+            const option = document.createElement('option');
+            option.value = location;
+            option.textContent = location;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load locations', error);
+    }
+}
+
+function renderTemplates(templates) {
+    const list = document.getElementById('template-list');
+    if (!list) return;
+
+    if (!templates || !templates.length) {
+        list.innerHTML = '<p>No templates yet. Create one to get started.</p>';
+        return;
+    }
+
+    list.innerHTML = templates
+        .map(template => `
+            <article class="template-card">
+                <header>
+                    <h3>${template.name}</h3>
+                    <span class="badge ${template.active ? 'complete' : 'pending'}">${template.active ? 'Active' : 'Inactive'}</span>
+                </header>
+                <p>${template.description || 'No description provided.'}</p>
+                <div class="template-meta">
+                    <span>${template.tasks?.length || 0} tasks</span>
+                </div>
+            </article>
+        `)
+        .join('');
+}
+
+// Game and query functions (placeholders)
+function startGame() {
+    const locationSelect = document.getElementById('location-select');
+    if (!locationSelect || !locationSelect.value) {
+        alert('Please select a location first.');
+        return;
+    }
+    alert('Game functionality is not currently implemented.');
+}
+
+function resetGame() {
+    const locationSelect = document.getElementById('location-select');
+    if (!locationSelect || !locationSelect.value) {
+        alert('Please select a location first.');
+        return;
+    }
+    alert('Game reset functionality is not currently implemented.');
+}
+
+function updateGameProgress() {
+    // Update game progress display when location changes
+    const locationSelect = document.getElementById('location-select');
+    const gameProgress = document.getElementById('game-progress');
+    if (gameProgress) {
+        gameProgress.style.display = locationSelect && locationSelect.value ? 'inline' : 'none';
+    }
+}
+
+function runQuery() {
+    const queryInput = document.getElementById('query-input');
+    const queryResults = document.getElementById('query-results');
+
+    if (!queryInput || !queryResults) return;
+
+    const query = queryInput.value.trim();
+    if (!query) {
+        alert('Please enter a query.');
+        return;
+    }
+
+    queryResults.innerHTML = '<p>Running query...</p>';
+
+    // Placeholder - NL SQL functionality is disabled
+    setTimeout(() => {
+        queryResults.innerHTML = '<p>Natural language SQL queries are currently disabled.</p>';
+    }, 1000);
+}
 
 // Ensure charts cleanup on unload
 window.addEventListener('beforeunload', () => {

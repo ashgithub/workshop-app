@@ -193,16 +193,20 @@ def _choice_breakdown(question: dict, cohort_id: int, include_flag: int) -> List
     if isinstance(config, dict):
         options = config.get("options") or []
 
+    # Oracle does not allow grouping/comparing on CLOB values directly (ORA-22848).
+    # Convert to VARCHAR2 using DBMS_LOB.SUBSTR before trimming/grouping.
+    response_expr = "TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1))"
+
     rows = db.execute_query(
-        """
-        SELECT TRIM(r.RESPONSE) AS response_value, COUNT(*) AS response_count
+        f"""
+        SELECT {response_expr} AS response_value, COUNT(*) AS response_count
         FROM ATTENDEE_INTRO_RESPONSES r
         JOIN ATTENDEES a ON a.ID = r.ATTENDEE_ID
         WHERE r.QUESTION_ID = :question_id
           AND a.COHORT_ID = :cohort_id
           AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
           AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
-        GROUP BY TRIM(r.RESPONSE)
+        GROUP BY {response_expr}
         """,
         {
             "question_id": question["id"],

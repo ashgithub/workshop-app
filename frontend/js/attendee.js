@@ -212,7 +212,7 @@ async function loadAttendee(attendeeId) {
         renderProfile(attendee);
         renderProgress(attendee.progress || {}, pageSections);
         renderPageSections(pageSections);
-        // Don't load sections initially - wait for navigation
+        // Don't load sections initially - wait for navigation (surveys load when tab opened)
     } catch (error) {
         console.error('Failed to load attendee', error);
         showMessage('Unable to load your workshop companion dashboard. Please try again.', 'error');
@@ -583,18 +583,38 @@ async function loadSurveys(attendeeId) {
             templates.map(template => fetchSurveySubmission(attendeeId, template.id))
         );
 
-        // Count completed surveys
-        const completed = submissions.filter(submission => submission !== null).length;
+        const isSubmissionComplete = submission => {
+            if (!submission) return false;
+            const responses = Array.isArray(submission.answers) ? submission.answers : [];
+            const meaningful = responses.filter(answer => {
+                if (!answer) return false;
+                const raw = answer.response;
+                if (raw === null || raw === undefined) return false;
+                const normalized = typeof raw === 'string' ? raw.trim() : String(raw).trim();
+                if (!normalized) return false;
+                if (normalized === '0') return false;
+                if (normalized.toLowerCase && normalized.toLowerCase() === 'null') return false;
+                return true;
+            });
+            console.debug('Survey completion check', { submission, meaningfulCount: meaningful.length, totalResponses: responses.length });
+            return meaningful.length > 0;
+        };
+
+        const normalizedSubmissions = submissions.map(submission => {
+            if (!submission) return null;
+            const isComplete = isSubmissionComplete(submission);
+            return { ...submission, isComplete };
+        });
+
+        const completed = normalizedSubmissions.filter(sub => sub?.isComplete).length;
         const total = templates.length;
 
-        // Update progress pill
         const pill = document.getElementById('surveys-progress-pill');
         if (pill) {
             pill.textContent = `${completed} of ${total} completed`;
         }
 
-        // Render survey tabs
-        renderSurveyTabs(templates, submissions, attendeeId);
+        renderSurveyTabs(templates, normalizedSubmissions, attendeeId, submission => Boolean(submission?.isComplete) || isSubmissionComplete(submission));
     } catch (error) {
         console.error('Failed to load surveys', error);
         const container = document.getElementById('survey-tabs');
@@ -616,7 +636,7 @@ async function fetchSurveySubmission(attendeeId, templateId) {
     return null;
 }
 
-function renderSurveyTabs(templates, submissions, attendeeId) {
+function renderSurveyTabs(templates, submissions, attendeeId, isCompleteFn = () => false) {
     const tabButtons = document.getElementById('survey-tab-buttons');
     const tabContent = document.getElementById('survey-tab-content');
 
@@ -625,8 +645,16 @@ function renderSurveyTabs(templates, submissions, attendeeId) {
     // Create tab buttons
     const buttonsHtml = templates.map((template, index) => {
         const submission = submissions[index];
-        const completed = Boolean(submission);
+        const isCompleted = Boolean(submission && submission.isComplete === true);
+        const completed = typeof submission?.isComplete === 'boolean' ? submission.isComplete : isCompleteFn(submission);
         const isActive = index === 0;
+
+        console.debug('Survey tab render', {
+            templateId: template.id,
+            templateName: template.name,
+            completed,
+            answers: submission?.answers || []
+        });
 
         return `
             <button class="survey-tab-btn ${completed ? 'completed' : ''} ${isActive ? 'active' : ''}" data-tab="${template.id}">
@@ -642,7 +670,7 @@ function renderSurveyTabs(templates, submissions, attendeeId) {
     const contentHtml = templates.map((template, index) => {
         const submission = submissions[index];
         const isActive = index === 0;
-        return renderSurveyTabContent(template, submission, attendeeId, isActive);
+        return renderSurveyTabContent(template, submission, attendeeId, isActive, isCompleteFn);
     }).join('');
 
     tabContent.innerHTML = contentHtml;
@@ -668,18 +696,23 @@ function renderSurveyTabs(templates, submissions, attendeeId) {
     initSurveyRatings(attendeeId);
 }
 
-function renderSurveyTabContent(template, submission, attendeeId, isActive) {
+function renderSurveyTabContent(template, submission, attendeeId, isActive, isCompleteFn = () => false) {
     // Create answers map from submission
     const answers = {};
-    if (submission && submission.answers) {
+    if (submission && submission.answers && isCompleteFn(submission)) {
         submission.answers.forEach(answer => {
-            // For simplicity, we'll map the first rating answer and first text answer
-            if (!answers.rating && answer.response && /^\d+$/.test(answer.response)) {
-                answers.rating = parseInt(answer.response);
-            } else if (!answers.whatLiked && answer.response && answer.response.length > 0) {
-                answers.whatLiked = answer.response;
-            } else if (!answers.whatBetter && answer.response && answer.response.length > 0) {
-                answers.whatBetter = answer.response;
+            const value = answer?.response;
+            if (value === null || value === undefined) return;
+            const normalized = typeof value === 'string' ? value.trim() : String(value).trim();
+            if (!normalized || normalized === '0' || normalized.toLowerCase() === 'null') return;
+
+            // Map the first rating answer and first two text answers
+            if (!answers.rating && /^\d+$/.test(normalized)) {
+                answers.rating = parseInt(normalized, 10);
+            } else if (!answers.whatLiked) {
+                answers.whatLiked = normalized;
+            } else if (!answers.whatBetter) {
+                answers.whatBetter = normalized;
             }
         });
     }

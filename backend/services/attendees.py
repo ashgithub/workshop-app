@@ -63,9 +63,14 @@ def get_progress(attendee_id: int) -> dict:
 
     submissions = db.fetch_one(
         """
-        SELECT COUNT(*)
-        FROM SURVEY_SUBMISSIONS
-        WHERE ATTENDEE_ID = :attendee_id
+        SELECT COUNT(DISTINCT s.TEMPLATE_ID)
+        FROM SURVEY_SUBMISSIONS s
+        JOIN SURVEY_TEMPLATES t ON t.ID = s.TEMPLATE_ID
+        JOIN SURVEY_ANSWERS a ON a.SUBMISSION_ID = s.ID
+        WHERE s.ATTENDEE_ID = :attendee_id
+          AND t.ACTIVE = 'Y'
+          AND a.RESPONSE IS NOT NULL
+          AND LENGTH(TRIM(a.RESPONSE)) > 0
         """,
         {"attendee_id": attendee_id},
     ) or (0,)

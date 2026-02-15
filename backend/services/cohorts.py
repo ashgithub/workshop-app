@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+import oracledb
+
 from backend.database import db
 
 
@@ -74,13 +76,22 @@ def find_attendee_by_email(cohort_id: int, email: str) -> Optional[dict]:
 
 
 def list_task_templates() -> List[dict]:
-    rows = db.execute_query(
-        """
-        SELECT ID, TITLE, DESCRIPTION, INSTRUCTIONS_URL, REQUIRED, DISPLAY_ORDER
-        FROM ONBOARDING_TASK_TEMPLATES
-        ORDER BY DISPLAY_ORDER, TITLE
-        """
-    )
+    try:
+        rows = db.execute_query(
+            """
+            SELECT ID, TITLE, DESCRIPTION, INSTRUCTIONS_URL, REQUIRED, DISPLAY_ORDER
+            FROM ONBOARDING_TASK_TEMPLATES
+            ORDER BY DISPLAY_ORDER, TITLE
+            """
+        )
+    except oracledb.DatabaseError as exc:
+        error = exc.args[0] if exc.args else None
+        error_code = getattr(error, "code", None)
+        # Some deployments no longer ship the legacy task template tables.
+        # The admin UI still calls this endpoint, so return an empty list.
+        if error_code == 942:  # ORA-00942 table or view does not exist
+            return []
+        raise
     return [
         {
             "id": row[0],

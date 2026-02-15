@@ -629,6 +629,25 @@ textarea:focus {
     margin-bottom: 24px;
 }
 
+.survey-tabs .section-header,
+#surveys-tab .section-header {
+    justify-content: space-between;
+    gap: 16px;
+}
+
+#surveys-tab .section-header > .btn-ghost {
+    flex: 0 0 auto;
+}
+
+#surveys-tab .section-header > div {
+    flex: 1 1 auto;
+}
+
+.section-header .back-btn {
+    flex: 0 0 auto;
+    width: auto;
+}
+
 .section-header h2 {
     color: var(--rw-foreground);
     font-size: 1.7rem;
@@ -1403,6 +1422,14 @@ gap: 8px;
     .section-header h3 {
         font-size: 1.1rem;
     }
+}
+
+/* Chart loading state */
+.chart-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--rw-muted);
+    font-style: italic;
 }
 
 .intro-section {
@@ -2945,7 +2972,217 @@ gap: 4px;
     font-size: 0.95rem;
 }
 
-.chart-card canvas {
+    /* Simple chart containers */
+    .simple-chart-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 120px;
+    }
+
+    .progress-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        gap: 8px 12px;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .progress-item.choice-question {
+        grid-template-rows: auto auto;
+        padding-bottom: 12px;
+    }
+
+    .progress-label {
+        grid-column: 1;
+        grid-row: 1;
+        font-weight: 600;
+        color: var(--rw-foreground);
+        font-size: 0.9rem;
+    }
+
+    .progress-bar-container {
+        grid-column: 1;
+        grid-row: 2;
+        width: 100%;
+        height: 8px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--rw-accent), var(--rw-accent-dark));
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        font-size: 0.85rem;
+        color: var(--rw-muted);
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .choice-breakdown-container {
+        grid-column: 1 / span 2;
+        grid-row: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+        padding-left: 16px;
+        border-left: 2px solid var(--rw-border);
+    }
+
+    .choice-breakdown-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.03);
+    }
+
+    .choice-breakdown-label {
+        font-weight: 500;
+        color: var(--rw-foreground);
+        font-size: 0.85rem;
+    }
+
+    .choice-breakdown-item .progress-bar-container {
+        height: 6px;
+        background: rgba(0, 0, 0, 0.08);
+    }
+
+    .choice-breakdown-item .progress-bar-fill {
+        background: linear-gradient(90deg, var(--rw-success), #22c55e);
+    }
+
+    .choice-breakdown-item .progress-stats {
+        font-size: 0.8rem;
+        color: var(--rw-muted);
+        font-weight: 500;
+    }
+
+    .truth-prompts-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .truth-prompt-item {
+        min-height: 60px;
+    }
+
+    .choice-breakdown {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .choice-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        gap: 6px 10px;
+        align-items: center;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .choice-label {
+        grid-column: 1;
+        grid-row: 1;
+        font-weight: 500;
+        color: var(--rw-foreground);
+        font-size: 0.85rem;
+    }
+
+    .choice-bar-container {
+        grid-column: 1;
+        grid-row: 2;
+        width: 100%;
+        height: 6px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .choice-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--rw-success), #22c55e);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    .choice-stats {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        font-size: 0.8rem;
+        color: var(--rw-muted);
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    /* Chart tabs */
+    .chart-tabs {
+        margin-top: 24px;
+    }
+
+    .chart-tab-buttons {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--rw-border);
+        padding-bottom: 8px;
+    }
+
+    .chart-tab-btn {
+        padding: 8px 16px;
+        border: 1px solid var(--rw-border);
+        border-radius: 8px 8px 0 0;
+        background: rgba(255, 255, 255, 0.8);
+        color: var(--rw-muted);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+    }
+
+    .chart-tab-btn:hover {
+        background: rgba(199, 70, 52, 0.05);
+        color: var(--rw-accent);
+    }
+
+    .chart-tab-btn.active {
+        background: var(--rw-accent-light);
+        color: var(--rw-accent-dark);
+        border-color: var(--rw-accent);
+        border-bottom-color: white;
+        font-weight: 600;
+    }
+
+    .chart-tab-content {
+        display: none;
+    }
+
+    .chart-tab-content.active {
+        display: block;
+    }
+
+    .chart-card canvas {
     width: 100%;
     min-height: 220px;
 }

@@ -319,18 +319,16 @@ async def get_onboarding_question(question_id: int):
         logger.error(f"Error getting onboarding question {question_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-+
-+@router.get("/dashboard")
-+async def get_dashboard_overview(cohort_id: int, include_test: bool = False):
-+    """Aggregate cohort progress metrics for admin analytics dashboard."""
-+    try:
-+        summary = dashboard_service.get_dashboard_summary(cohort_id, include_test)
-+        return summary
-+    except dashboard_service.CohortNotFoundError:
-+        raise HTTPException(status_code=404, detail="Cohort not found")
-+    except HTTPException:
-+        raise
-+    except Exception as exc:  # pragma: no cover - defensive logging
-+        logger.error("Failed to gather dashboard summary for cohort %s: %s", cohort_id, exc)
-+        raise HTTPException(status_code=500, detail="Unable to load dashboard summary")
-*** End Patch
+@router.get("/dashboard")
+async def get_dashboard_overview(cohort_id: int, include_test: bool = False):
+    """Aggregate cohort progress metrics for admin analytics dashboard."""
+    try:
+        summary = dashboard_service.get_dashboard_summary(cohort_id, include_test)
+        return summary
+    except dashboard_service.CohortNotFoundError:
+        raise HTTPException(status_code=404, detail="Cohort not found")
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("Failed to gather dashboard summary for cohort %s: %s", cohort_id, exc)
+        raise HTTPException(status_code=500, detail="Unable to load dashboard summary")
