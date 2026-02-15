@@ -332,3 +332,298 @@ async def get_dashboard_overview(cohort_id: int, include_test: bool = False):
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Failed to gather dashboard summary for cohort %s: %s", cohort_id, exc)
         raise HTTPException(status_code=500, detail="Unable to load dashboard summary")
+
+
+# Game Management Endpoints
+@router.get("/game/attendees")
+async def get_game_attendees(cohort_id: int):
+    """
+    Get all attendees with their 2TL statements and game status for admin management.
+    """
+    try:
+        # Verify cohort exists
+        cohort_check = db.execute_query("SELECT ID, TITLE, LOCATION_NAME FROM COHORTS WHERE ID = :cohort_id", {"cohort_id": cohort_id})
+        if not cohort_check:
+            raise HTTPException(status_code=404, detail="Cohort not found")
+
+        cohort_info = cohort_check[0]
+
+        # Get attendees with their 2TL responses and game status
+        query = """
+        SELECT
+            a.ID,
+            a.FULL_NAME,
+            a.EMAIL,
+            a.TITLE,
+            a.MANAGER,
+            a.PROFILE_IMAGE,
+            c.ID as COHORT_ID,
+            c.TITLE as COHORT_TITLE,
+            c.LOCATION_NAME,
+            c.ROOM,
+            c.START_DATE,
+            c.END_DATE,
+            c.START_TIME,
+            c.END_TIME,
+            ir1.RESPONSE as TL1,
+            ir2.RESPONSE as TL2,
+            ir3.RESPONSE as TL3,
+            COALESCE(gl.STATUS, 'PENDING') as GAME_STATUS,
+            gl.REVEALED_LIE
+        FROM ATTENDEES a
+        JOIN COHORTS c ON c.ID = a.COHORT_ID
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir1 ON ir1.ATTENDEE_ID = a.ID AND ir1.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_1')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir2 ON ir2.ATTENDEE_ID = a.ID AND ir2.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_2')
+        LEFT JOIN ATTENDEE_INTRO_RESPONSES ir3 ON ir3.ATTENDEE_ID = a.ID AND ir3.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_3')
+        LEFT JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+        WHERE c.ID = :cohort_id
+        ORDER BY a.FULL_NAME
+        """
+
+        result = db.execute_query(query, {"cohort_id": cohort_id})
+
+        if not result:
+            return {"attendees": [], "cohort": {"id": cohort_info[0], "title": cohort_info[1], "location": cohort_info[2]}}
+
+        attendees = []
+        for row in result:
+            attendee = {
+                "id": row[0],
+                "full_name": row[1],
+                "email": row[2],
+                "title": row[3],
+                "manager": row[4],
+                "profile_image": row[5],
+                "cohort": {
+                    "id": row[6],
+                    "title": row[7],
+                    "location": row[8],
+                    "room": row[9],
+                    "start_date": str(row[10]) if row[10] else None,
+                    "end_date": str(row[11]) if row[11] else None,
+                    "start_time": str(row[12]) if row[12] else None,
+                    "end_time": str(row[13]) if row[13] else None
+                },
+                "tl1": str(row[14]) if row[14] is not None else None,
+                "tl2": str(row[15]) if row[15] is not None else None,
+                "tl3": str(row[16]) if row[16] is not None else None,
+                "game_status": row[17] or "PENDING",
+                "revealed_lie": row[18]
+            }
+            attendees.append(attendee)
+
+        return {
+            "attendees": attendees,
+            "cohort": {
+                "id": cohort_info[0],
+                "title": cohort_info[1],
+                "location": cohort_info[2]
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting game attendees for cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/game/progress")
+async def get_game_progress(cohort_id: int):
+    """
+    Get progress for 2 Truths and a Lie game: number played vs total attendees for a cohort.
+    """
+    try:
+        # Total: all attendees in cohort with statements
+        total_result = db.execute_query("""
+            SELECT COUNT(DISTINCT a.ID)
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            JOIN ATTENDEE_INTRO_RESPONSES ir ON ir.ATTENDEE_ID = a.ID
+            JOIN INTRO_QUESTIONS iq ON iq.ID = ir.QUESTION_ID AND iq.CODE IN ('truth_1', 'truth_2', 'truth_3')
+            WHERE c.ID = :cohort_id
+            AND LENGTH(TRIM(ir.RESPONSE)) > 0
+        """, {"cohort_id": cohort_id})
+        total = total_result[0][0] if total_result and len(total_result) > 0 else 0
+
+        # Played: attendees marked as played in GAME_LOGS
+        played_result = db.execute_query("""
+            SELECT COUNT(*)
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+            WHERE c.ID = :cohort_id
+            AND gl.STATUS = 'PLAYED'
+        """, {"cohort_id": cohort_id})
+        played_count = played_result[0][0] if played_result and len(played_result) > 0 else 0
+
+        return {"played": played_count, "total": total, "progress": f"{played_count}/{total}"}
+
+    except Exception as e:
+        logger.error(f"Error getting game progress for cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/game/next")
+async def get_next_game_attendee(cohort_id: int):
+    """
+    Get random attendee who hasn't played yet for the 2TL game.
+    """
+    try:
+        # Get random attendee who hasn't played and has statements
+        result = db.execute_query("""
+            SELECT
+                a.ID,
+                a.FULL_NAME,
+                a.EMAIL,
+                a.TITLE,
+                a.MANAGER,
+                a.PROFILE_IMAGE,
+                c.ID as COHORT_ID,
+                c.TITLE as COHORT_TITLE,
+                c.LOCATION_NAME,
+                c.ROOM,
+                c.START_DATE,
+                c.END_DATE,
+                c.START_TIME,
+                c.END_TIME,
+                ir1.RESPONSE as INTRO,
+                ir2.RESPONSE as TL1,
+                ir3.RESPONSE as TL2,
+                ir4.RESPONSE as TL3,
+                COALESCE(gl.STATUS, 'PENDING') as GAME_STATUS
+            FROM ATTENDEES a
+            JOIN COHORTS c ON c.ID = a.COHORT_ID
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir1 ON ir1.ATTENDEE_ID = a.ID AND ir1.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'intro')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir2 ON ir2.ATTENDEE_ID = a.ID AND ir2.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_1')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir3 ON ir3.ATTENDEE_ID = a.ID AND ir3.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_2')
+            LEFT JOIN ATTENDEE_INTRO_RESPONSES ir4 ON ir4.ATTENDEE_ID = a.ID AND ir4.QUESTION_ID = (SELECT ID FROM INTRO_QUESTIONS WHERE CODE = 'truth_3')
+            LEFT JOIN GAME_LOGS gl ON gl.ATTENDEE_ID = a.ID
+            WHERE c.ID = :cohort_id
+            AND (gl.STATUS IS NULL OR gl.STATUS != 'PLAYED')
+            AND (ir2.RESPONSE IS NOT NULL OR ir3.RESPONSE IS NOT NULL OR ir4.RESPONSE IS NOT NULL)
+            ORDER BY DBMS_RANDOM.VALUE
+            FETCH FIRST 1 ROW ONLY
+        """, {"cohort_id": cohort_id})
+
+        if not result or len(result) == 0:
+            return {"message": "No more attendees available for the game."}
+
+        row = result[0]
+        attendee = {
+            "id": row[0],
+            "full_name": row[1],
+            "email": row[2],
+            "title": row[3],
+            "manager": row[4],
+            "profile_image": row[5],
+            "cohort": {
+                "id": row[6],
+                "title": row[7],
+                "location": row[8],
+                "room": row[9],
+                "start_date": str(row[10]) if row[10] else None,
+                "end_date": str(row[11]) if row[11] else None,
+                "start_time": str(row[12]) if row[12] else None,
+                "end_time": str(row[13]) if row[13] else None
+            },
+            "intro": str(row[14]) if row[14] is not None else None,
+            "tl1": str(row[15]) if row[15] is not None else None,
+            "tl2": str(row[16]) if row[16] is not None else None,
+            "tl3": str(row[17]) if row[17] is not None else None,
+            "game_status": row[18] or "PENDING"
+        }
+
+        return {"attendee": attendee}
+
+    except Exception as e:
+        logger.error(f"Error getting next game attendee for cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/play/{attendee_id}")
+async def mark_attendee_as_played(attendee_id: int):
+    """
+    Mark attendee as having played the 2TL game.
+    """
+    try:
+        # Insert or update GAME_LOGS record
+        db.execute_dml("""
+            MERGE INTO GAME_LOGS gl
+            USING (SELECT :attendee_id AS ATTENDEE_ID FROM DUAL) src
+            ON (gl.ATTENDEE_ID = src.ATTENDEE_ID)
+            WHEN MATCHED THEN
+                UPDATE SET STATUS = 'PLAYED', TIMESTAMP = CURRENT_TIMESTAMP
+            WHEN NOT MATCHED THEN
+                INSERT (ATTENDEE_ID, STATUS, TIMESTAMP)
+                VALUES (:attendee_id, 'PLAYED', CURRENT_TIMESTAMP)
+        """, {"attendee_id": attendee_id})
+
+        return {"message": "Attendee marked as played"}
+
+    except Exception as e:
+        logger.error(f"Error marking attendee {attendee_id} as played: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/reveal/{attendee_id}")
+async def reveal_lie(attendee_id: int, lie_number: int = Query(..., description="Which statement is the lie (1, 2, or 3)")):
+    """
+    Reveal which statement was the lie for an attendee.
+    """
+    try:
+        if lie_number not in [1, 2, 3]:
+            raise HTTPException(status_code=400, detail="Lie number must be 1, 2, or 3")
+
+        # Update GAME_LOGS with revealed lie
+        db.execute_dml("""
+            MERGE INTO GAME_LOGS gl
+            USING (SELECT :attendee_id AS ATTENDEE_ID FROM DUAL) src
+            ON (gl.ATTENDEE_ID = src.ATTENDEE_ID)
+            WHEN MATCHED THEN
+                UPDATE SET STATUS = 'REVEALED', REVEALED_LIE = :lie_number, TIMESTAMP = CURRENT_TIMESTAMP
+            WHEN NOT MATCHED THEN
+                INSERT (ATTENDEE_ID, STATUS, REVEALED_LIE, TIMESTAMP)
+                VALUES (:attendee_id, 'REVEALED', :lie_number, CURRENT_TIMESTAMP)
+        """, {"attendee_id": attendee_id, "lie_number": lie_number})
+
+        return {"message": f"Revealed statement {lie_number} as the lie"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revealing lie for attendee {attendee_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.put("/game/reset")
+async def reset_game_flags(cohort_id: int):
+    """
+    Reset game flags for all attendees in a specific cohort.
+    """
+    try:
+        # Check if cohort exists
+        cohort_check = db.execute_query(
+            "SELECT ID FROM COHORTS WHERE ID = :cohort_id",
+            {"cohort_id": cohort_id}
+        )
+        if not cohort_check or cohort_check[0][0] == 0:
+            raise HTTPException(status_code=404, detail="No attendees found for the specified cohort")
+
+        # Delete game logs for this cohort
+        affected_rows = db.execute_dml("""
+            DELETE FROM GAME_LOGS
+            WHERE ATTENDEE_ID IN (
+                SELECT a.ID FROM ATTENDEES a
+                JOIN COHORTS c ON c.ID = a.COHORT_ID
+                WHERE c.ID = :cohort_id
+            )
+        """, {"cohort_id": cohort_id})
+
+        return {"message": f"Reset game status for {affected_rows} attendees in cohort {cohort_id}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting game flags for cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

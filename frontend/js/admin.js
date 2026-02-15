@@ -762,23 +762,296 @@ async function loadLocations() {
     }
 }
 
-// Game and query functions (placeholders)
-function startGame() {
+// Game-related functions
+let currentCohort = '';
+
+async function updateGameProgress() {
     const cohortSelect = document.getElementById('cohort-select');
-    if (!cohortSelect || !cohortSelect.value) {
-        alert('Please select a cohort first.');
-        return;
+    const gameProgress = document.getElementById('game-progress');
+    if (!cohortSelect || !gameProgress) return;
+
+    const cohortId = cohortSelect.value;
+    if (cohortId) {
+        gameProgress.style.display = 'inline';
+        try {
+            const response = await apiFetch(`/api/admin/game/progress?cohort_id=${cohortId}`);
+            if (response.ok) {
+                const data = await response.json();
+                gameProgress.textContent = data.progress;
+                if (data.total === 0) {
+                    gameProgress.textContent += ' (No one has statements yet – time to get those truths flowing!)';
+                } else if (data.played === data.total) {
+                    gameProgress.textContent += ' (All truths revealed! Ready for a rematch? Will present live!)';
+                }
+            } else {
+                gameProgress.textContent = '?/?';
+            }
+        } catch (error) {
+            console.error('Error updating progress:', error);
+            gameProgress.textContent = '?/?';
+        }
+    } else {
+        gameProgress.style.display = 'none';
+        gameProgress.textContent = '';
     }
-    alert('Game functionality is not currently implemented.');
 }
 
-function resetGame() {
+async function startGame() {
     const cohortSelect = document.getElementById('cohort-select');
-    if (!cohortSelect || !cohortSelect.value) {
+    const gameDisplay = document.getElementById('game-display');
+    if (!cohortSelect || !gameDisplay) return;
+
+    const cohortId = cohortSelect.value;
+    if (!cohortId) {
+        gameDisplay.innerHTML = '<p>Please select a cohort first.</p>';
+        return;
+    }
+
+    currentCohort = cohortId;
+    await loadNextAttendee();
+}
+
+async function resetGame() {
+    const cohortSelect = document.getElementById('cohort-select');
+    const gameDisplay = document.getElementById('game-display');
+    if (!cohortSelect) return;
+
+    const cohortId = cohortSelect.value;
+    if (!cohortId) {
         alert('Please select a cohort first.');
         return;
     }
-    alert('Game reset functionality is not currently implemented.');
+
+    if (!confirm(`Are you sure you want to reset the 2 Truths and a Lie game for all attendees in this cohort? This will set all attendees back to unplayed status.`)) {
+        return;
+    }
+
+    try {
+        const response = await apiFetch(`/api/admin/game/reset?cohort_id=${cohortId}`, {
+            method: 'PUT'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            alert(data.message);
+            if (gameDisplay) gameDisplay.innerHTML = '<p>Game reset for cohort. You can now start a new game.</p>';
+            currentCohort = cohortId;
+            await updateGameProgress();
+        } else {
+            throw new Error('Reset failed');
+        }
+    } catch (error) {
+        console.error('Error resetting game:', error);
+        alert('Error resetting game. Please try again.');
+    }
+}
+
+async function loadNextAttendee() {
+    const gameDisplay = document.getElementById('game-display');
+    if (!gameDisplay) return;
+
+    gameDisplay.innerHTML = '<p>Loading next attendee...</p>';
+
+    try {
+        const response = await apiFetch(`/api/admin/game/next?cohort_id=${currentCohort}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch attendee');
+        }
+        const data = await response.json();
+
+        if (data.attendee) {
+            displayAttendee(data.attendee);
+        } else {
+            gameDisplay.innerHTML = `<p>${data.message || 'No more attendees available.'}</p>`;
+        }
+    } catch (error) {
+        console.error('Error loading next attendee:', error);
+        gameDisplay.innerHTML = '<p>Error loading attendee. Please try again.</p>';
+    }
+}
+
+function displayAttendee(attendee) {
+    const gameDisplay = document.getElementById('game-display');
+    if (!gameDisplay) return;
+
+    // Format profile image
+    const imagePath = attendee.profile_image;
+    let avatarHtml;
+    if (imagePath) {
+        avatarHtml = `<img id="profile-img" src="${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
+    } else {
+        avatarHtml = `<img id="profile-img" src="${runtimeConfig.basePath}/static/images/default-avatar.svg" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
+    }
+
+    // Format attendee info (hide cohort/room/date details for game)
+    const infoLines = [
+        `<strong>Role:</strong> ${attendee.title || 'Pending'}`,
+        `<strong>Manager:</strong> ${attendee.manager || 'Pending'}`,
+    ];
+
+    const locationDetailsHtml = `<div class="cohort-meta">${infoLines.map(line => `<p>${line}</p>`).join('')}</div>`;
+
+    let introHtml;
+    if (!attendee.intro) {
+        introHtml = '<p>This mystery attendee is saving their story for the spotlight – uncover it live!</p>';
+    } else {
+        introHtml = `<p style="margin: 0; white-space: pre-wrap;">${attendee.intro}</p>`;
+    }
+
+    let statementsHtml;
+    if (!attendee.tl1 && !attendee.tl2 && !attendee.tl3) {
+        statementsHtml = `
+            <div class="statements" style="margin: 20px 0;">
+                <h4>2 Truths and 1 Lie:</h4>
+                <p>This attendee was too busy to craft their lies – we'll present statements live!</p>
+            </div>
+        `;
+    } else {
+        statementsHtml = `
+            <div class="statements" style="margin: 20px 0;">
+                <h4>2 Truths and 1 Lie:</h4>
+                <ol style="padding-left: 20px;">
+                    <li>${attendee.tl1 || 'Statement not provided'}</li>
+                    <li>${attendee.tl2 || 'Statement not provided'}</li>
+                    <li>${attendee.tl3 || 'Statement not provided'}</li>
+                </ol>
+            </div>
+        `;
+    }
+
+    const html = `
+        <div class="attendee-portal card" style="margin: 20px 0;">
+            <div class="attendee-profile" style="display: flex; gap: 30px; align-items: flex-start;">
+                <div class="profile-image">
+                    ${avatarHtml}
+                </div>
+                <div class="profile-info" style="flex: 1;">
+                    <h1 style="margin: 0; font-size: 1.8rem; color: #333;">${attendee.full_name}</h1>
+                    <p style="margin: 5px 0; color: #666; font-size: 1.1rem;">${attendee.email}</p>
+                    ${locationDetailsHtml}
+                </div>
+            </div>
+
+            <div class="intro-section" style="margin-top: 30px;">
+                <div class="section-header">
+                    <div>
+                        <h2>Introduction</h2>
+                        <p class="section-subtext">Get to know this attendee</p>
+                    </div>
+                </div>
+                <div class="intro-panel" style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 10px;">
+                    ${introHtml}
+                </div>
+            </div>
+        </div>
+
+        ${statementsHtml}
+        <div class="game-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn-primary" id="mark-played" data-id="${attendee.id}">Mark as Played</button>
+            <button class="btn-secondary" id="next-person">Next Person</button>
+            <button class="btn-secondary" id="reveal-lie" data-id="${attendee.id}">Reveal Lie</button>
+        </div>
+    `;
+
+    gameDisplay.innerHTML = html;
+
+    // Add event listeners for buttons
+    const markBtn = document.getElementById('mark-played');
+    if (markBtn) {
+        markBtn.addEventListener('click', async function() {
+            const attendeeId = this.dataset.id;
+            try {
+                const putResponse = await apiFetch(`/api/admin/game/play/${attendeeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (putResponse.ok) {
+                    console.log('Marked as played');
+                    await updateGameProgress();
+                    await loadNextAttendee();
+                } else {
+                    alert('Error marking as played. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error marking as played:', error);
+                alert('Error marking as played.');
+            }
+        });
+    }
+
+    const nextBtn = document.getElementById('next-person');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', loadNextAttendee);
+    }
+
+    const revealBtn = document.getElementById('reveal-lie');
+    if (revealBtn) {
+        revealBtn.addEventListener('click', async function() {
+            const attendeeId = this.dataset.id;
+            const lieNumber = prompt('Which statement is the lie? (1, 2, or 3)');
+            if (!lieNumber || !['1', '2', '3'].includes(lieNumber)) {
+                alert('Please enter 1, 2, or 3');
+                return;
+            }
+
+            try {
+                const response = await apiFetch(`/api/admin/game/reveal/${attendeeId}?lie_number=${lieNumber}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    await updateGameProgress();
+                } else {
+                    alert('Error revealing lie. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error revealing lie:', error);
+                alert('Error revealing lie.');
+            }
+        });
+    }
+}
+
+function formatDateRange(start, end, startTime, endTime) {
+    if (!start) {
+        return null;
+    }
+    const startDate = new Date(start);
+    const endDate = end ? new Date(end) : null;
+    const startText = startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    if (endDate) {
+        const endText = endDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const year = startDate.getFullYear();
+        const dateRange = `${startText} – ${endText} ${year}`;
+        const timeRange = formatTimeRange(startTime, endTime);
+        return timeRange ? `${dateRange} · ${timeRange}` : dateRange;
+    }
+    const singleDate = startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeRange = formatTimeRange(startTime, endTime);
+    return timeRange ? `${singleDate} · ${timeRange}` : singleDate;
+}
+
+function formatTimeRange(startTime, endTime) {
+    const startText = formatTime(startTime);
+    const endText = formatTime(endTime);
+
+    if (startText && endText) {
+        return `${startText} – ${endText}`;
+    }
+    return startText || endText || null;
+}
+
+function formatTime(value) {
+    if (!value) {
+        return null;
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+    // Fallback: return raw string if not a valid date (e.g., "9:00 AM")
+    return value;
 }
 
 function handleGameCohortChange() {
@@ -786,15 +1059,6 @@ function handleGameCohortChange() {
     if (cohortSelect) {
         remember('adminGameCohort', cohortSelect.value);
         updateGameProgress();
-    }
-}
-
-function updateGameProgress() {
-    // Update game progress display when cohort changes
-    const cohortSelect = document.getElementById('cohort-select');
-    const gameProgress = document.getElementById('game-progress');
-    if (gameProgress) {
-        gameProgress.style.display = cohortSelect && cohortSelect.value ? 'inline' : 'none';
     }
 }
 
