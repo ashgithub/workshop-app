@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Workshop Companion - Admin Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
     <div class="page-shell">
@@ -18,14 +19,31 @@
         <main class="container">
             <div class="admin-dashboard card">
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="cohorts">Cohorts</button>
+                    <button class="tab-btn active" data-tab="progress">Progress</button>
+                    <button class="tab-btn" data-tab="cohorts">Cohorts</button>
                     <button class="tab-btn" data-tab="tasks">Onboarding Templates</button>
                     <button class="tab-btn" data-tab="surveys">Surveys</button>
                     <button class="tab-btn" data-tab="game">2TL Game</button>
                     <button class="tab-btn" data-tab="queries">NL SQL</button>
                 </div>
 
-                <section id="cohorts-tab" class="tab-content active">
+                <section id="progress-tab" class="tab-content active">
+                    <div class="progress-toolbar">
+                        <label class="progress-filter">
+                            <span>Cohort</span>
+                            <select id="progress-cohort-select">
+                                <option value="">Select cohort</option>
+                            </select>
+                        </label>
+                        <label class="progress-filter toggle">
+                            <input type="checkbox" id="include-test-toggle">
+                            <span>Include test attendees</span>
+                        </label>
+                    </div>
+                    <div id="progress-content" class="progress-shell"></div>
+                </section>
+
+                <section id="cohorts-tab" class="tab-content">
                     <div class="section-header">
                         <div>
                             <h2>Cohorts</h2>
@@ -96,6 +114,6 @@
         <footer class="site-footer">© 2026 Oracle AI Workshop Companion</footer>
     </div>
 
-    <script src="js/admin.js"></script>
+    <script src="js/admin.js" defer></script>
 </body>
 </html>

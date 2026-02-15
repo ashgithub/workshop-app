@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 def _authenticate_admin(email: str, password: Optional[str]) -> LoginResponse:
     if password is None or password != config.admin_shared_password:
-        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+        logger.error(f"{password} <> {config.admin_shared_password}")
+        raise HTTPException(status_code=401, detail=f"Invalid admin credentials")
 
     rows = db.execute_query(
         "SELECT ID, FULL_NAME, IS_ACTIVE FROM ADMIN_USERS WHERE UPPER(EMAIL) = UPPER(:email)",
