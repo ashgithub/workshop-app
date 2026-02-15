@@ -627,3 +627,335 @@ async def reset_game_flags(cohort_id: int):
     except Exception as e:
         logger.error(f"Error resetting game flags for cohort {cohort_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Progress Details Endpoints
+@router.get("/progress/intro/{question_code}/details")
+async def get_intro_question_details(
+    question_code: str,
+    cohort_id: int,
+    include_test: bool = False
+):
+    """
+    Get detailed participant lists for an intro question (answered vs not answered).
+    For choice questions, also break down by answer options.
+    """
+    try:
+        # Get question details
+        question = db.execute_query("""
+            SELECT ID, QUESTION_TYPE, CONFIG
+            FROM INTRO_QUESTIONS
+            WHERE CODE = :question_code
+        """, {"question_code": question_code})
+
+        if not question:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        question_id, question_type, config_str = question[0]
+        include_flag = 1 if include_test else 0
+
+        result = {"question": {"code": question_code, "type": question_type}, "tabs": []}
+
+        if question_type == "choice":
+            # Handle choice questions - tabs for each option plus unanswered
+            import json
+            options = []
+
+            if config_str:
+                try:
+                    config = json.loads(config_str) if isinstance(config_str, str) else config_str
+                    options = config.get("options", []) if isinstance(config, dict) else []
+                    logger.info(f"Choice question {question_code}: parsed {len(options)} options from config")
+                except Exception as e:
+                    logger.error(f"Failed to parse config for choice question {question_code}: {e}")
+                    options = []
+
+            # If no options found in config, try to get them from actual responses
+            if not options:
+                # Get distinct responses to create tabs dynamically
+                distinct_responses = db.execute_query("""
+                    SELECT DISTINCT TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) as response_value
+                    FROM ATTENDEE_INTRO_RESPONSES r
+                    JOIN ATTENDEES a ON r.ATTENDEE_ID = a.ID
+                    WHERE r.QUESTION_ID = :question_id
+                      AND a.COHORT_ID = :cohort_id
+                      AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                      AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+                    ORDER BY response_value
+                """, {
+                    "cohort_id": cohort_id,
+                    "include_test": include_flag,
+                    "question_id": question_id
+                })
+
+                options = [{"value": row[0], "label": row[0]} for row in (distinct_responses or [])]
+                logger.info(f"Choice question {question_code}: found {len(options)} options from responses")
+
+            # Add tabs for each answer option
+            for option in options:
+                if not isinstance(option, dict) or not option.get("value"):
+                    continue
+
+                value = str(option["value"])
+                label = option.get("label", value)
+
+                # Get participants who selected this option
+                participants = db.execute_query("""
+                    SELECT a.FULL_NAME, a.EMAIL
+                    FROM ATTENDEES a
+                    JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID
+                    WHERE a.COHORT_ID = :cohort_id
+                      AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                      AND r.QUESTION_ID = :question_id
+                      AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = :response_value
+                    ORDER BY a.FULL_NAME
+                """, {
+                    "cohort_id": cohort_id,
+                    "include_test": include_flag,
+                    "question_id": question_id,
+                    "response_value": value
+                })
+
+                result["tabs"].append({
+                    "label": label,
+                    "participants": [{"name": row[0], "email": row[1]} for row in (participants or [])]
+                })
+
+            # Add unanswered tab
+            unanswered = db.execute_query("""
+                SELECT a.FULL_NAME, a.EMAIL
+                FROM ATTENDEES a
+                LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
+                WHERE a.COHORT_ID = :cohort_id
+                  AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                  AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+                ORDER BY a.FULL_NAME
+            """, {
+                "cohort_id": cohort_id,
+                "include_test": include_flag,
+                "question_id": question_id
+            })
+
+            result["tabs"].append({
+                "label": "Unanswered",
+                "participants": [{"name": row[0], "email": row[1]} for row in (unanswered or [])]
+            })
+
+            logger.info(f"Choice question {question_code}: created {len(result['tabs'])} tabs")
+
+        else:
+            # Handle text questions - answered vs not answered
+            answered = db.execute_query("""
+                SELECT a.FULL_NAME, a.EMAIL
+                FROM ATTENDEES a
+                JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID
+                WHERE a.COHORT_ID = :cohort_id
+                  AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                  AND r.QUESTION_ID = :question_id
+                  AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+                ORDER BY a.FULL_NAME
+            """, {
+                "cohort_id": cohort_id,
+                "include_test": include_flag,
+                "question_id": question_id
+            })
+
+            unanswered = db.execute_query("""
+                SELECT a.FULL_NAME, a.EMAIL
+                FROM ATTENDEES a
+                LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
+                WHERE a.COHORT_ID = :cohort_id
+                  AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                  AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+                ORDER BY a.FULL_NAME
+            """, {
+                "cohort_id": cohort_id,
+                "include_test": include_flag,
+                "question_id": question_id
+            })
+
+            result["tabs"] = [
+                {"label": "Answered", "participants": [{"name": row[0], "email": row[1]} for row in (answered or [])]},
+                {"label": "Unanswered", "participants": [{"name": row[0], "email": row[1]} for row in (unanswered or [])]}
+            ]
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting intro question details for question {question_code}, cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/progress/onboarding/{question_code}/details")
+async def get_onboarding_question_details(
+    question_code: str,
+    cohort_id: int,
+    include_test: bool = False
+):
+    """
+    Get detailed participant lists for an onboarding question (completed vs not completed).
+    """
+    try:
+        include_flag = 1 if include_test else 0
+
+        # Get question ID from code
+        question_result = db.execute_query("""
+            SELECT ID FROM ONBOARDING_QUESTIONS WHERE CODE = :question_code
+        """, {"question_code": question_code})
+
+        if not question_result:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        question_id = question_result[0][0]
+
+        # Get completed participants
+        completed = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            JOIN ATTENDEE_ONBOARDING_RESPONSES r ON r.ATTENDEE_ID = a.ID
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND r.QUESTION_ID = :question_id
+              AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag,
+            "question_id": question_id
+        })
+
+        # Get not completed participants
+        not_completed = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            LEFT JOIN ATTENDEE_ONBOARDING_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag,
+            "question_id": question_id
+        })
+
+        return {
+            "question": {"type": "onboarding", "code": question_code},
+            "tabs": [
+                {"label": "Completed", "participants": [{"name": row[0], "email": row[1]} for row in (completed or [])]},
+                {"label": "Not Completed", "participants": [{"name": row[0], "email": row[1]} for row in (not_completed or [])]}
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting onboarding question details for question {question_code}, cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/progress/survey/{template_id}/details")
+async def get_survey_details(
+    template_id: int,
+    cohort_id: int,
+    include_test: bool = False
+):
+    """
+    Get detailed participant lists for a survey (submitted vs not submitted).
+    """
+    try:
+        include_flag = 1 if include_test else 0
+
+        # Get participants who submitted the survey
+        submitted = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            JOIN SURVEY_SUBMISSIONS s ON s.ATTENDEE_ID = a.ID
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND s.TEMPLATE_ID = :template_id
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag,
+            "template_id": template_id
+        })
+
+        # Get participants who didn't submit the survey
+        not_submitted = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            LEFT JOIN SURVEY_SUBMISSIONS s ON s.ATTENDEE_ID = a.ID AND s.TEMPLATE_ID = :template_id
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND s.ATTENDEE_ID IS NULL
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag,
+            "template_id": template_id
+        })
+
+        return {
+            "question": {"type": "survey"},
+            "tabs": [
+                {"label": "Submitted", "participants": [{"name": row[0], "email": row[1]} for row in (submitted or [])]},
+                {"label": "Not Submitted", "participants": [{"name": row[0], "email": row[1]} for row in (not_submitted or [])]}
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting survey details for template {template_id}, cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/progress/attendees/accepted")
+async def get_accepted_attendees_details(
+    cohort_id: int,
+    include_test: bool = False
+):
+    """
+    Get detailed participant lists for accepted vs not accepted attendees.
+    """
+    try:
+        include_flag = 1 if include_test else 0
+
+        # Get accepted attendees (ACKNOWLEDGED = 'Y')
+        accepted = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND a.ACKNOWLEDGED = 'Y'
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag
+        })
+
+        # Get not accepted attendees (ACKNOWLEDGED != 'Y' or NULL)
+        not_accepted = db.execute_query("""
+            SELECT a.FULL_NAME, a.EMAIL
+            FROM ATTENDEES a
+            WHERE a.COHORT_ID = :cohort_id
+              AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+              AND (a.ACKNOWLEDGED != 'Y' OR a.ACKNOWLEDGED IS NULL)
+            ORDER BY a.FULL_NAME
+        """, {
+            "cohort_id": cohort_id,
+            "include_test": include_flag
+        })
+
+        return {
+            "question": {"type": "attendees"},
+            "tabs": [
+                {"label": "Accepted", "participants": [{"name": row[0], "email": row[1]} for row in (accepted or [])]},
+                {"label": "Not Accepted", "participants": [{"name": row[0], "email": row[1]} for row in (not_accepted or [])]}
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting accepted attendees details for cohort {cohort_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

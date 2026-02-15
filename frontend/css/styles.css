@@ -1952,7 +1952,7 @@ padding: 20px;
     to { transform: scale(1); opacity: 1; }
 }
 
-/* Modal styles for agenda popup */
+/* Modal styles */
 .modal {
     display: none;
     position: fixed;
@@ -1971,7 +1971,7 @@ padding: 20px;
     padding: 20px;
     border-radius: 8px;
     width: 90%;
-    max-width: 800px;
+    max-width: 900px;
     max-height: 90vh;
     overflow: auto;
     position: relative;
@@ -1995,10 +1995,105 @@ padding: 20px;
     text-decoration: none;
 }
 
-#modal-img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
+/* Modal summary */
+.modal-summary {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--rw-foreground);
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    background: rgba(199, 70, 52, 0.1);
+    border-radius: 6px;
+    text-align: center;
+}
+
+/* Modal tabs */
+.modal-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 20px 0;
+    border-bottom: 1px solid #e1e5e9;
+    overflow-x: auto;
+}
+
+.modal-tab-btn {
+    padding: 8px 16px;
+    border: 1px solid #e1e5e9;
+    border-bottom: none;
+    background: #f8f9fa;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.modal-tab-btn.active {
+    background: white;
+    border-color: var(--rw-accent);
+    color: var(--rw-accent-dark);
+    font-weight: 600;
+}
+
+.modal-tab-btn:hover:not(.active) {
+    background: #e9ecef;
+}
+
+.modal-tab-content {
+    padding: 20px 0;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Participant list */
+.participant-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.participant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.participant-name {
+    font-weight: 500;
+    color: #374151;
+}
+
+.participant-email {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.copy-emails-btn {
+    margin-top: 16px;
+    padding: 8px 16px;
+    background: var(--rw-accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.copy-emails-btn:hover {
+    background: var(--rw-accent-dark);
+}
+
+.no-participants {
+    text-align: center;
+    color: #6b7280;
+    padding: 40px;
+    font-style: italic;
 }
 
 @keyframes fadeIn {
@@ -3180,6 +3275,46 @@ gap: 4px;
 
     .chart-tab-content.active {
         display: block;
+    }
+
+    /* Progress item container for proper button positioning */
+    .progress-item-container {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .progress-item-container .progress-item {
+        flex: 1;
+    }
+
+    .progress-item-container .view-details-btn {
+        flex-shrink: 0;
+        align-self: flex-start;
+        margin-top: 0;
+    }
+
+    /* Clickable headline card */
+    .headline-card.clickable {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .headline-card.clickable:hover {
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(15, 35, 95, 0.15);
+    }
+
+    .view-details-hint {
+        font-size: 0.75rem;
+        color: var(--rw-accent);
+        font-weight: 500;
+        margin-top: 4px;
+        text-align: center;
     }
 
     .chart-card canvas {

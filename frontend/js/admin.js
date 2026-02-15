@@ -292,8 +292,11 @@ function renderProgressDashboard(data) {
                 <p class="headline-value">${data.headline.attendees_total}</p>
             </div>
             <div class="headline-card">
-                <p class="headline-label">Accepted attendees</p>
-                <p class="headline-value">${data.headline.attendees_accepted}</p>
+                <div class="headline-content">
+                    <p class="headline-label">Accepted attendees</p>
+                    <p class="headline-value">${data.headline.attendees_accepted}</p>
+                </div>
+                <button class="view-details-btn" onclick="showAcceptedAttendeesDetails()">View Details</button>
             </div>
         </section>
         <section class="chart-grid" aria-label="Progress charts">
@@ -323,8 +326,11 @@ function renderCharts(data) {
                 <p class="headline-value">${data.headline.attendees_total}</p>
             </div>
             <div class="headline-card">
-                <p class="headline-label">Accepted attendees</p>
-                <p class="headline-value">${data.headline.attendees_accepted}</p>
+                <div class="headline-content">
+                    <p class="headline-label">Accepted attendees</p>
+                    <p class="headline-value">${data.headline.attendees_accepted}</p>
+                </div>
+                <button class="view-details-btn" onclick="showAcceptedAttendeesDetails()">View Details</button>
             </div>
         </section>
 
@@ -466,7 +472,7 @@ function renderIntroCharts(intro) {
     const otherIntroQuestions = combinedQuestions.filter(q => !q.code || !q.code.startsWith('truth_'));
 
     // Render main introduction completion chart (excluding truth questions)
-    renderSimpleProgressChart('intro-completion-chart', otherIntroQuestions);
+    renderSimpleProgressChart('intro-completion-chart', otherIntroQuestions, 'intro');
 
     // Render consolidated Two Truths & One Lie summary
     if (truthQuestions.length > 0) {
@@ -478,7 +484,7 @@ function renderIntroCharts(intro) {
             completed: totalCompleted,
             total: totalTotal
         };
-        renderSimpleProgressChart('truth-summary-chart', [summaryItem]);
+        renderSimpleProgressChart('truth-summary-chart', [summaryItem], 'intro');
     } else {
         const container = document.getElementById('truth-summary-chart');
         if (container) container.innerHTML = '<p>No truth prompts configured.</p>';
@@ -1081,6 +1087,372 @@ function runQuery() {
         queryResults.innerHTML = '<p>Natural language SQL queries are currently disabled.</p>';
     }, 1000);
 }
+
+// Progress Details Modal Functions
+function initProgressDetailsModal() {
+    const modal = document.getElementById('progress-modal');
+    const closeBtn = document.getElementById('modal-close');
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeProgressModal);
+    }
+
+    // Close modal when clicking outside
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeProgressModal();
+            }
+        });
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && modal.style.display === 'block') {
+            closeProgressModal();
+        }
+    });
+}
+
+function openProgressModal(title) {
+    const modal = document.getElementById('progress-modal');
+    const modalTitle = document.getElementById('modal-title');
+
+    if (modal && modalTitle) {
+        modalTitle.textContent = title;
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+}
+
+function closeProgressModal() {
+    const modal = document.getElementById('progress-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+}
+
+async function showProgressDetails(questionType, questionId, questionTitle) {
+    const cohortId = document.getElementById('progress-cohort-select')?.value;
+    const includeTest = document.getElementById('include-test-toggle')?.checked || false;
+
+    if (!cohortId) {
+        alert('Please select a cohort first.');
+        return;
+    }
+
+    try {
+        let apiUrl = '';
+        if (questionType === 'intro') {
+            apiUrl = `/api/admin/progress/intro/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+        } else if (questionType === 'onboarding') {
+            apiUrl = `/api/admin/progress/onboarding/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+        } else if (questionType === 'survey') {
+            apiUrl = `/api/admin/progress/survey/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+        }
+
+        const response = await apiFetch(apiUrl);
+        if (!response.ok) {
+            throw new Error('Failed to load participant details');
+        }
+
+        const data = await response.json();
+        renderProgressModal(data, questionTitle);
+        openProgressModal(questionTitle);
+
+    } catch (error) {
+        console.error('Error loading progress details:', error);
+        alert('Failed to load participant details. Please try again.');
+    }
+}
+
+async function showAcceptedAttendeesDetails() {
+    const cohortId = document.getElementById('progress-cohort-select')?.value;
+    const includeTest = document.getElementById('include-test-toggle')?.checked || false;
+
+    if (!cohortId) {
+        alert('Please select a cohort first.');
+        return;
+    }
+
+    try {
+        const apiUrl = `/api/admin/progress/attendees/accepted?cohort_id=${cohortId}&include_test=${includeTest}`;
+
+        const response = await apiFetch(apiUrl);
+        if (!response.ok) {
+            throw new Error('Failed to load participant details');
+        }
+
+        const data = await response.json();
+        renderProgressModal(data, 'Accepted Attendees');
+        openProgressModal('Accepted Attendees');
+
+    } catch (error) {
+        console.error('Error loading accepted attendees details:', error);
+        alert('Failed to load participant details. Please try again.');
+    }
+}
+
+function renderProgressModal(data, questionTitle) {
+    const modalTabs = document.getElementById('modal-tabs');
+    const modalContent = document.getElementById('modal-tab-content');
+
+    if (!modalTabs || !modalContent || !data.tabs) return;
+
+    // Render tabs
+    const tabsHtml = data.tabs.map((tab, index) => `
+        <button class="modal-tab-btn ${index === 0 ? 'active' : ''}" data-tab-index="${index}">
+            ${tab.label} (${tab.participants.length})
+        </button>
+    `).join('');
+
+    modalTabs.innerHTML = tabsHtml;
+
+    // Render initial tab content
+    if (data.tabs.length > 0) {
+        renderModalTabContent(data.tabs[0]);
+    }
+
+    // Add tab click handlers
+    modalTabs.querySelectorAll('.modal-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabIndex = parseInt(e.target.dataset.tabIndex);
+
+            // Update active tab button
+            modalTabs.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+
+            // Render tab content
+            renderModalTabContent(data.tabs[tabIndex]);
+        });
+    });
+}
+
+function renderModalTabContent(tab) {
+    const modalContent = document.getElementById('modal-tab-content');
+
+    if (!modalContent || !tab.participants) return;
+
+    if (tab.participants.length === 0) {
+        modalContent.innerHTML = '<div class="no-participants">No participants in this category.</div>';
+        return;
+    }
+
+    const participantsHtml = tab.participants.map((participant, index) => `
+        <div class="participant-item">
+            <div class="participant-name">${index + 1}. ${participant.name}</div>
+            <div class="participant-email">${participant.email}</div>
+        </div>
+    `).join('');
+
+    const emails = tab.participants.map(p => p.email).join(', ');
+
+    modalContent.innerHTML = `
+        <div class="participant-list">
+            ${participantsHtml}
+        </div>
+        <button class="copy-emails-btn" onclick="copyEmailsToClipboard('${emails.replace(/'/g, "\\'")}')">
+            Copy All Email Addresses
+        </button>
+    `;
+}
+
+function copyEmailsToClipboard(emails) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(emails).then(() => {
+            showCopyFeedback();
+        }).catch(() => {
+            fallbackCopyEmails(emails);
+        });
+    } else {
+        fallbackCopyEmails(emails);
+    }
+}
+
+function fallbackCopyEmails(emails) {
+    const textArea = document.createElement('textarea');
+    textArea.value = emails;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+        document.execCommand('copy');
+        showCopyFeedback();
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert('Failed to copy emails. Please copy manually: ' + emails);
+    }
+
+    document.body.removeChild(textArea);
+}
+
+function showCopyFeedback() {
+    // Create a temporary feedback element
+    const feedback = document.createElement('div');
+    feedback.textContent = 'Emails copied to clipboard!';
+    feedback.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--rw-success);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        z-index: 1001;
+        font-weight: 500;
+    `;
+
+    document.body.appendChild(feedback);
+
+    setTimeout(() => {
+        if (feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+        }
+    }, 2000);
+}
+
+// Updated renderSimpleProgressChart to include "View Details" buttons
+function renderSimpleProgressChart(containerId, items, questionType) {
+    const container = document.getElementById(containerId);
+    if (!container || !Array.isArray(items) || !items.length) {
+        if (container) container.innerHTML = '';
+        return;
+    }
+
+    const html = items.map((item, index) => {
+        // Check if this is a choice question with breakdown data
+        if (item.breakdown && Array.isArray(item.breakdown) && item.breakdown.length > 0) {
+            // Calculate total responses
+            const totalResponses = item.breakdown.reduce((sum, c) => sum + (c.count || 0), 0);
+
+            // Render choice breakdown
+            const choiceHtml = item.breakdown.map(choice => {
+                const count = choice.count || 0;
+                const total = item.completed || item.breakdown.reduce((sum, c) => sum + (c.count || 0), 0);
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                const label = choice.label || choice.value || 'Unknown';
+
+                return `
+                    <div class="choice-breakdown-item">
+                        <div class="choice-breakdown-label">${label}</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="progress-stats">${count}/${total} (${percentage}%)</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="progress-item-container">
+                    <div class="progress-item choice-question">
+                        <div class="progress-label">${index + 1}. ${item.label || item.code || 'Unknown'}</div>
+                        <div class="choice-total-summary">${totalResponses} of ${item.total || totalResponses}</div>
+                        <div class="choice-breakdown-container">
+                            ${choiceHtml}
+                        </div>
+                    </div>
+                    <button class="view-details-btn" onclick="showProgressDetails('${questionType}', '${item.code}', '${item.label || item.code || 'Question'}')">
+                        View Details
+                    </button>
+                </div>
+            `;
+        } else {
+            // Render simple progress bar for text questions
+            const completed = item.completed || 0;
+            const total = item.total || 1;
+            const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const label = item.label || item.code || 'Unknown';
+
+            return `
+                <div class="progress-item-container">
+                    <div class="progress-item">
+                        <div class="progress-label">${index + 1}. ${label}</div>
+                        <div class="total-summary">${completed} of ${total}</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="progress-stats">${completed}/${total} (${percentage}%)</div>
+                    </div>
+                    <button class="view-details-btn" onclick="showProgressDetails('${questionType}', '${item.code}', '${label}')">
+                        View Details
+                    </button>
+                </div>
+            `;
+        }
+    }).join('');
+
+    container.innerHTML = html;
+}
+
+// Updated renderOnboardingChart to include buttons
+function renderOnboardingChart(items) {
+    renderSimpleProgressChart('onboarding-step-chart', items, 'onboarding');
+}
+
+// Updated renderSurveyChart to include buttons
+function renderSurveyChart(items) {
+    const container = document.getElementById('survey-completion-chart');
+    if (!container || !Array.isArray(items) || !items.length) {
+        if (container) container.innerHTML = '';
+        return;
+    }
+
+    const html = items.map((item, index) => {
+        const completed = item.completed || 0;
+        const expected = item.expected || 1;
+        const percentage = expected > 0 ? Math.round((completed / expected) * 100) : 0;
+        const name = item.name || 'Unknown Survey';
+
+        return `
+            <div class="progress-item-container">
+                <div class="progress-item">
+                    <div class="progress-label">${index + 1}. ${name}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="progress-stats">${completed}/${expected} (${percentage}%)</div>
+                </div>
+                <button class="view-details-btn" onclick="showProgressDetails('survey', '${item.template_id}', '${name}')">
+                    View Details
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
+}
+
+// Add CSS for view details button
+const style = document.createElement('style');
+style.textContent = `
+    .view-details-btn {
+        margin-top: 8px;
+        padding: 4px 12px;
+        background: var(--rw-accent);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: background 0.2s ease;
+    }
+    .view-details-btn:hover {
+        background: var(--rw-accent-dark);
+    }
+`;
+document.head.appendChild(style);
+
+// Initialize modal when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    initProgressDetailsModal();
+});
 
 // Ensure charts cleanup on unload
 window.addEventListener('beforeunload', () => {
