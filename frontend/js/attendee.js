@@ -35,7 +35,27 @@ async function apiFetch(path, options = {}) {
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
-    return fetch(path, { ...options, headers });
+
+    const method = (options.method || 'GET').toUpperCase();
+    const startedAt = performance?.now ? performance.now() : Date.now();
+    console.debug('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
+
+    try {
+        const response = await fetch(path, { ...options, headers });
+        const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
+        console.debug('[apiFetch:response]', {
+            method,
+            path,
+            status: response.status,
+            ok: response.ok,
+            elapsedMs: Math.round(elapsedMs),
+        });
+        return response;
+    } catch (error) {
+        const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
+        console.error('[apiFetch:error]', { method, path, elapsedMs: Math.round(elapsedMs), error });
+        throw error;
+    }
 }
 
 function handleAvatarFallback(img) {
@@ -624,7 +644,7 @@ async function loadSurveys(attendeeId) {
 
 async function fetchSurveySubmission(attendeeId, templateId) {
     try {
-        const response = await apiFetch(`/api/surveys/submissions/${attendeeId}/${templateId}`);
+        const response = await apiFetch(`api/surveys/submissions/${attendeeId}/${templateId}`);
         if (response.ok) {
             return await response.json();
         }
@@ -785,7 +805,7 @@ function showSurvey(attendeeId, templateId) {
 async function loadSurveyContent(attendeeId, templateId) {
     try {
         // Load template info and questions
-        const templateResponse = await apiFetch(`/api/surveys/templates/${templateId}`);
+        const templateResponse = await apiFetch(`api/surveys/templates/${templateId}`);
         if (!templateResponse.ok) {
             throw new Error('Failed to load survey template');
         }
@@ -795,7 +815,7 @@ async function loadSurveyContent(attendeeId, templateId) {
         const submission = await fetchSurveySubmission(attendeeId, templateId);
 
         // Load questions
-        const questionsResponse = await apiFetch(`/api/surveys/templates/${templateId}/questions`);
+        const questionsResponse = await apiFetch(`api/surveys/templates/${templateId}/questions`);
         if (!questionsResponse.ok) {
             throw new Error('Failed to load survey questions');
         }
@@ -913,7 +933,7 @@ async function submitSurvey(attendeeId, templateId, questions) {
             }
         }
 
-        const response = await apiFetch(`/api/surveys/submissions/${attendeeId}/${templateId}`, {
+        const response = await apiFetch(`api/surveys/submissions/${attendeeId}/${templateId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answers })
@@ -1030,7 +1050,7 @@ async function submitSimpleSurvey(attendeeId, templateId) {
         }
 
         // Fetch questions to get actual question IDs
-        const questionsResponse = await apiFetch(`/api/surveys/templates/${templateId}/questions`);
+        const questionsResponse = await apiFetch(`api/surveys/templates/${templateId}/questions`);
         if (!questionsResponse.ok) {
             throw new Error('Failed to load survey questions');
         }
@@ -1063,7 +1083,7 @@ async function submitSimpleSurvey(attendeeId, templateId) {
             });
         }
 
-        const response = await apiFetch(`/api/surveys/submissions/${attendeeId}/${templateId}`, {
+        const response = await apiFetch(`api/surveys/submissions/${attendeeId}/${templateId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answers })
@@ -1351,7 +1371,7 @@ function renderIntroductions(intros, progress, acknowledged) {
             const attendeeId = getAttendeeId();
             if (!attendeeId) return;
             try {
-                const saveResponse = await apiFetch(`/api/intros/attendees/${attendeeId}/${questionId}`, {
+                const saveResponse = await apiFetch(`api/intros/attendees/${attendeeId}/${questionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ response }),
@@ -1381,7 +1401,7 @@ function renderIntroductions(intros, progress, acknowledged) {
                 const response = container ? getInputValue(intro, container) : '';
                 if (response.trim() === (intro.response || '').trim()) continue;
                 try {
-                    const saveResponse = await apiFetch(`/api/intros/attendees/${attendeeId}/${intro.question_id}`, {
+                    const saveResponse = await apiFetch(`api/intros/attendees/${attendeeId}/${intro.question_id}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ response }),

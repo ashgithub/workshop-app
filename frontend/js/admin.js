@@ -37,7 +37,27 @@ async function apiFetch(path, options = {}) {
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
-    return fetch(path, { ...options, headers });
+
+    const method = (options.method || 'GET').toUpperCase();
+    const startedAt = performance?.now ? performance.now() : Date.now();
+    console.debug('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
+
+    try {
+        const response = await fetch(path, { ...options, headers });
+        const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
+        console.debug('[apiFetch:response]', {
+            method,
+            path,
+            status: response.status,
+            ok: response.ok,
+            elapsedMs: Math.round(elapsedMs),
+        });
+        return response;
+    } catch (error) {
+        const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
+        console.error('[apiFetch:error]', { method, path, elapsedMs: Math.round(elapsedMs), error });
+        throw error;
+    }
 }
 
 function remember(key, value) {
