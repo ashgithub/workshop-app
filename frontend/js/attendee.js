@@ -31,13 +31,11 @@ function loadRuntimeConfig() {
 
 async function apiFetch(path, options = {}) {
     const config = await loadRuntimeConfig();
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    const url = `${config.basePath || ''}${normalized}`;
     const headers = new Headers(options.headers || {});
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
-    return fetch(url, { ...options, headers });
+    return fetch(path, { ...options, headers });
 }
 
 function handleAvatarFallback(img) {
@@ -177,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const attendeeId = getAttendeeId();
             if (!attendeeId) return;
             try {
-                const response = await apiFetch(`/api/attendees/${attendeeId}/ack`, {
+                const response = await apiFetch(`api/attendees/${attendeeId}/ack`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ acknowledged: true }),
@@ -199,14 +197,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadAttendee(attendeeId) {
     try {
         hideMessage();
-        const response = await apiFetch(`/api/attendees/${attendeeId}`);
+        const response = await apiFetch(`api/attendees/${attendeeId}`);
         if (!response.ok) {
             throw new Error(await response.text());
         }
         const attendee = await response.json();
 
         // Load page sections configuration
-        const sectionsResponse = await apiFetch('/api/page-sections');
+        const sectionsResponse = await apiFetch('api/page-sections');
         const pageSections = sectionsResponse.ok ? await sectionsResponse.json() : {};
 
         renderProfile(attendee);
@@ -242,7 +240,7 @@ function navigateToSection(section) {
             break;
         case 'intro':
             // Load attendee data and render introductions
-            apiFetch(`/api/attendees/${attendeeId}`)
+            apiFetch(`api/attendees/${attendeeId}`)
                 .then(res => res.json())
                 .then(attendee => {
                     const progress = attendee.progress || {};
@@ -453,7 +451,7 @@ function renderProgress(progress, pageSections = {}) {
 
 async function loadOnboarding(attendeeId) {
     try {
-        const response = await apiFetch(`/api/onboarding/attendees/${attendeeId}`);
+        const response = await apiFetch(`api/onboarding/attendees/${attendeeId}`);
         if (!response.ok) {
             throw new Error(await response.text());
         }
@@ -521,7 +519,7 @@ function renderOnboarding(attendeeId, onboarding) {
             if (response === (question.response || '')) return;
 
             try {
-                const saveResponse = await apiFetch(`/api/onboarding/attendees/${attendeeId}/${questionId}`, {
+                const saveResponse = await apiFetch(`api/onboarding/attendees/${attendeeId}/${questionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ response }),
@@ -548,7 +546,7 @@ function renderOnboarding(attendeeId, onboarding) {
                 const response = container ? getOnboardingInputValue(question, container) : '';
                 if (response === (question.response || '')) continue;
                 try {
-                    const saveResponse = await apiFetch(`/api/onboarding/attendees/${attendeeId}/${question.question_id}`, {
+                    const saveResponse = await apiFetch(`api/onboarding/attendees/${attendeeId}/${question.question_id}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ response }),
@@ -572,7 +570,7 @@ function renderOnboarding(attendeeId, onboarding) {
 
 async function loadSurveys(attendeeId) {
     try {
-        const response = await apiFetch('/api/surveys/templates');
+        const response = await apiFetch('api/surveys/templates');
         if (!response.ok) {
             throw new Error(await response.text());
         }

@@ -33,13 +33,11 @@ function loadRuntimeConfig() {
 
 async function apiFetch(path, options = {}) {
     const config = await loadRuntimeConfig();
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    const url = `${config.basePath || ''}${normalized}`;
     const headers = new Headers(options.headers || {});
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
-    return fetch(url, { ...options, headers });
+    return fetch(path, { ...options, headers });
 }
 
 function remember(key, value) {
@@ -141,7 +139,7 @@ function handleProgressFilters() {
 
 async function loadCohorts() {
     try {
-        const response = await apiFetch('/api/cohorts/');
+        const response = await apiFetch('api/cohorts/');
         if (!response.ok) {
             throw new Error(await response.text());
         }
@@ -155,7 +153,7 @@ async function loadCohorts() {
 
 async function loadGameCohorts() {
     try {
-        const response = await apiFetch('/api/cohorts/');
+        const response = await apiFetch('api/cohorts/');
         if (!response.ok) {
             throw new Error(await response.text());
         }
@@ -262,7 +260,7 @@ async function loadDashboard() {
     const includeTest = includeToggle.checked;
 
     try {
-        const response = await apiFetch(`/api/admin/dashboard?cohort_id=${cohortId}&include_test=${includeTest}`);
+        const response = await apiFetch(`api/admin/dashboard?cohort_id=${cohortId}&include_test=${includeTest}`);
         if (!response.ok) {
             const message = await response.text();
             throw new Error(message || 'Unable to load dashboard');
@@ -748,7 +746,7 @@ function destroyChart(canvasId) {
 
 async function loadLocations() {
     try {
-        const response = await apiFetch('/api/admin/locations');
+        const response = await apiFetch('api/admin/locations');
         if (!response.ok) {
             throw new Error(await response.text());
         }
@@ -780,7 +778,7 @@ async function updateGameProgress() {
     if (cohortId) {
         gameProgress.style.display = 'inline';
         try {
-            const response = await apiFetch(`/api/admin/game/progress?cohort_id=${cohortId}`);
+            const response = await apiFetch(`api/admin/game/progress?cohort_id=${cohortId}`);
             if (response.ok) {
                 const data = await response.json();
                 gameProgress.textContent = data.progress;
@@ -833,7 +831,7 @@ async function resetGame() {
     }
 
     try {
-        const response = await apiFetch(`/api/admin/game/reset?cohort_id=${cohortId}`, {
+        const response = await apiFetch(`api/admin/game/reset?cohort_id=${cohortId}`, {
             method: 'PUT'
         });
         if (response.ok) {
@@ -858,7 +856,7 @@ async function loadNextAttendee() {
     gameDisplay.innerHTML = '<p>Loading next attendee...</p>';
 
     try {
-        const response = await apiFetch(`/api/admin/game/next?cohort_id=${currentCohort}`);
+        const response = await apiFetch(`api/admin/game/next?cohort_id=${currentCohort}`);
         if (!response.ok) {
             throw new Error('Failed to fetch attendee');
         }
@@ -966,7 +964,7 @@ function displayAttendee(attendee) {
         markBtn.addEventListener('click', async function() {
             const attendeeId = this.dataset.id;
             try {
-                const putResponse = await apiFetch(`/api/admin/game/play/${attendeeId}`, {
+                const putResponse = await apiFetch(`api/admin/game/play/${attendeeId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1000,7 +998,7 @@ function displayAttendee(attendee) {
             }
 
             try {
-                const response = await apiFetch(`/api/admin/game/reveal/${attendeeId}?lie_number=${lieNumber}`, {
+                const response = await apiFetch(`api/admin/game/reveal/${attendeeId}?lie_number=${lieNumber}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1145,11 +1143,11 @@ async function showProgressDetails(questionType, questionId, questionTitle) {
     try {
         let apiUrl = '';
         if (questionType === 'intro') {
-            apiUrl = `/api/admin/progress/intro/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+            apiUrl = `api/admin/progress/intro/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
         } else if (questionType === 'onboarding') {
-            apiUrl = `/api/admin/progress/onboarding/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+            apiUrl = `api/admin/progress/onboarding/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
         } else if (questionType === 'survey') {
-            apiUrl = `/api/admin/progress/survey/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
+            apiUrl = `api/admin/progress/survey/${questionId}/details?cohort_id=${cohortId}&include_test=${includeTest}`;
         }
 
         const response = await apiFetch(apiUrl);
@@ -1177,7 +1175,7 @@ async function showAcceptedAttendeesDetails() {
     }
 
     try {
-        const apiUrl = `/api/admin/progress/attendees/accepted?cohort_id=${cohortId}&include_test=${includeTest}`;
+        const apiUrl = `api/admin/progress/attendees/accepted?cohort_id=${cohortId}&include_test=${includeTest}`;
 
         const response = await apiFetch(apiUrl);
         if (!response.ok) {
