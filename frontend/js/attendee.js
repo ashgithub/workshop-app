@@ -9,6 +9,18 @@ let runtimeConfig = {
     enabled: false,
 };
 
+function normalizeDocumentRelativePath(value) {
+    if (!value) return '';
+    let path = String(value).trim();
+    if (!path) return '';
+    // We want paths like "static/images/..." so they resolve under /workshop-app/...
+    // when hosted behind a prefix.
+    if (path.startsWith('/')) {
+        path = path.slice(1);
+    }
+    return path;
+}
+
 function loadRuntimeConfig() {
     if (!runtimeConfigPromise) {
         runtimeConfigPromise = fetch('api/runtime-config')
@@ -38,12 +50,12 @@ async function apiFetch(path, options = {}) {
 
     const method = (options.method || 'GET').toUpperCase();
     const startedAt = performance?.now ? performance.now() : Date.now();
-    console.debug('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
+    console.log('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
 
     try {
         const response = await fetch(path, { ...options, headers });
         const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
-        console.debug('[apiFetch:response]', {
+        console.log('[apiFetch:response]', {
             method,
             path,
             status: response.status,
@@ -63,7 +75,7 @@ function handleAvatarFallback(img) {
         return;
     }
     img.dataset.fallbackApplied = 'true';
-    img.src = `${runtimeConfig.basePath}/static/images/default-avatar.svg`;
+    img.src = 'static/images/default-avatar.svg';
 }
 
 function getAttendeeId() {
@@ -98,7 +110,7 @@ function showAgenda(imagePath) {
     const modal = document.getElementById('agenda-modal');
     const modalImg = document.getElementById('modal-img');
     if (!modal || !modalImg) return;
-    modalImg.src = `${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+    modalImg.src = normalizeDocumentRelativePath(imagePath);
     modal.style.display = 'block';
 }
 
@@ -319,9 +331,9 @@ function renderProfile(attendee) {
     if (avatarEl) {
         const imagePath = attendee.profile_image;
         if (imagePath) {
-            avatarEl.src = `${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+            avatarEl.src = normalizeDocumentRelativePath(imagePath);
         } else {
-            avatarEl.src = `${runtimeConfig.basePath}/static/images/default-avatar.svg`;
+            avatarEl.src = 'static/images/default-avatar.svg';
         }
     }
 
@@ -614,7 +626,7 @@ async function loadSurveys(attendeeId) {
                 if (normalized.toLowerCase && normalized.toLowerCase() === 'null') return false;
                 return true;
             });
-            console.debug('Survey completion check', { submission, meaningfulCount: meaningful.length, totalResponses: responses.length });
+            console.log('Survey completion check', { submission, meaningfulCount: meaningful.length, totalResponses: responses.length });
             return meaningful.length > 0;
         };
 
@@ -649,7 +661,7 @@ async function fetchSurveySubmission(attendeeId, templateId) {
             return await response.json();
         }
     } catch (error) {
-        console.debug('No submission yet for template', templateId);
+        console.log('No submission yet for template', templateId);
     }
     return null;
 }
@@ -667,7 +679,7 @@ function renderSurveyTabs(templates, submissions, attendeeId, isCompleteFn = () 
         const completed = typeof submission?.isComplete === 'boolean' ? submission.isComplete : isCompleteFn(submission);
         const isActive = index === 0;
 
-        console.debug('Survey tab render', {
+        console.log('Survey tab render', {
             templateId: template.id,
             templateName: template.name,
             completed,

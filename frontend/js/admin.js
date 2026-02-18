@@ -9,6 +9,18 @@ let runtimeConfig = {
     enabled: false,
 };
 
+function normalizeDocumentRelativePath(value) {
+    if (!value) return '';
+    let path = String(value).trim();
+    if (!path) return '';
+    // We want paths like "static/images/..." so they resolve under /workshop-app/...
+    // when hosted behind a prefix.
+    if (path.startsWith('/')) {
+        path = path.slice(1);
+    }
+    return path;
+}
+
 const chartRegistry = new Map();
 
 function loadRuntimeConfig() {
@@ -40,12 +52,12 @@ async function apiFetch(path, options = {}) {
 
     const method = (options.method || 'GET').toUpperCase();
     const startedAt = performance?.now ? performance.now() : Date.now();
-    console.debug('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
+    console.log('[apiFetch]', { method, path, runtimeBasePath: config.basePath, proxyEnabled: config.enabled });
 
     try {
         const response = await fetch(path, { ...options, headers });
         const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
-        console.debug('[apiFetch:response]', {
+        console.log('[apiFetch:response]', {
             method,
             path,
             status: response.status,
@@ -901,9 +913,9 @@ function displayAttendee(attendee) {
     const imagePath = attendee.profile_image;
     let avatarHtml;
     if (imagePath) {
-        avatarHtml = `<img id="profile-img" src="${runtimeConfig.basePath}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
+        avatarHtml = `<img id="profile-img" src="${normalizeDocumentRelativePath(imagePath)}" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
     } else {
-        avatarHtml = `<img id="profile-img" src="${runtimeConfig.basePath}/static/images/default-avatar.svg" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
+        avatarHtml = `<img id="profile-img" src="static/images/default-avatar.svg" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 8px; object-fit: cover;">`;
     }
 
     // Format attendee info (hide cohort/room/date details for game)
