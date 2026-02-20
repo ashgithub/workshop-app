@@ -1159,7 +1159,7 @@ function renderQueryResults(payload, container) {
         ? `
             <div class="query-block">
                 <div class="query-block-title">Generated SQL</div>
-                <pre class="query-sql"><code>${escapeHtml(sql)}</code></pre>
+                <pre class="query-sql"><code>${escapeHtml(formatSql(sql))}</code></pre>
             </div>
         `
         : '';
@@ -1169,6 +1169,48 @@ function renderQueryResults(payload, container) {
         : '<div class="query-empty">No results returned.</div>';
 
     container.innerHTML = headerHtml + sqlHtml + tableHtml;
+}
+
+function formatSql(sql) {
+    if (!sql) return '';
+    const normalized = String(sql).trim();
+    if (!normalized) return '';
+    if (normalized.includes('\n')) return normalized;
+
+    const tokens = [
+        'SELECT',
+        'FROM',
+        'WHERE',
+        'GROUP BY',
+        'HAVING',
+        'ORDER BY',
+        'LIMIT',
+        'OFFSET',
+        'UNION',
+        'UNION ALL',
+        'LEFT JOIN',
+        'RIGHT JOIN',
+        'INNER JOIN',
+        'OUTER JOIN',
+        'FULL JOIN',
+        'JOIN',
+        'ON',
+        'AND',
+        'OR',
+    ];
+
+    let formatted = normalized;
+    tokens.forEach(token => {
+        const escaped = token.replace(/\s+/g, '\\s+');
+        const pattern = new RegExp(`\\s+(${escaped})\\s+`, 'gi');
+        formatted = formatted.replace(pattern, `\n$1 `);
+    });
+
+    return formatted
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .join('\n');
 }
 
 function buildQueryTable(columns, rows) {
