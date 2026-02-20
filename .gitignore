@@ -57,6 +57,7 @@ backend/static/images/
 frontend/images/
 
 #other files
+scratch/*
 data/*
 .aider*
 test*.py

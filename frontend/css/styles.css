@@ -3487,6 +3487,110 @@ padding: 16px;
     gap: 12px;
 }
 
+.query-label {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.query-results {
+    margin-top: 16px;
+    display: grid;
+    gap: 16px;
+}
+
+.query-placeholder,
+.query-loading,
+.query-empty,
+.query-error {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    color: #475569;
+}
+
+.query-error {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.6);
+}
+
+.query-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.query-summary-title {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.query-summary-meta {
+    font-size: 0.9rem;
+    color: #475569;
+    background: rgba(59, 130, 246, 0.08);
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+.query-block {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.query-block-title {
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 10px;
+}
+
+.query-sql {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    border-radius: 12px;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.query-table-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 16px;
+    padding: 8px;
+    overflow-x: auto;
+}
+
+.query-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.query-table th,
+.query-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.query-table th {
+    background: rgba(248, 250, 252, 0.9);
+    color: #0f172a;
+    font-weight: 600;
+}
+
 
 .intro-input textarea {
     min-height: 160px;
@@ -3874,4 +3978,3 @@ footer.site-footer {
         font-size: 1.1rem;
     }
 }
-

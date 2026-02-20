@@ -1101,6 +1101,7 @@ function handleGameCohortChange() {
 function runQuery() {
     const queryInput = document.getElementById('query-input');
     const queryResults = document.getElementById('query-results');
+    const queryButton = document.getElementById('query-btn');
 
     if (!queryInput || !queryResults) return;
 
@@ -1110,12 +1111,98 @@ function runQuery() {
         return;
     }
 
-    queryResults.innerHTML = '<p>Running query...</p>';
+    queryResults.innerHTML = '<div class="query-loading">Running query...</div>';
+    if (queryButton) {
+        queryButton.disabled = true;
+        queryButton.textContent = 'Running...';
+    }
 
-    // Placeholder - NL SQL functionality is disabled
-    setTimeout(() => {
-        queryResults.innerHTML = '<p>Natural language SQL queries are currently disabled.</p>';
-    }, 1000);
+    apiFetch('api/admin/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+    })
+        .then(async response => {
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Query failed');
+            }
+            renderQueryResults(payload, queryResults);
+        })
+        .catch(error => {
+            queryResults.innerHTML = `<div class="query-error">${error.message}</div>`;
+        })
+        .finally(() => {
+            if (queryButton) {
+                queryButton.disabled = false;
+                queryButton.textContent = 'Run Query';
+            }
+        });
+}
+
+function renderQueryResults(payload, container) {
+    if (!container) return;
+
+    const summary = payload.summary || 'Query complete.';
+    const sql = payload.sql || '';
+    const columns = Array.isArray(payload.columns) ? payload.columns : [];
+    const rows = Array.isArray(payload.results) ? payload.results : [];
+
+    const headerHtml = `
+        <div class="query-summary">
+            <div class="query-summary-title">${summary}</div>
+            <div class="query-summary-meta">Rows: ${rows.length}</div>
+        </div>
+    `;
+
+    const sqlHtml = sql
+        ? `
+            <div class="query-block">
+                <div class="query-block-title">Generated SQL</div>
+                <pre class="query-sql"><code>${escapeHtml(sql)}</code></pre>
+            </div>
+        `
+        : '';
+
+    const tableHtml = rows.length
+        ? buildQueryTable(columns, rows)
+        : '<div class="query-empty">No results returned.</div>';
+
+    container.innerHTML = headerHtml + sqlHtml + tableHtml;
+}
+
+function buildQueryTable(columns, rows) {
+    let columnList = columns;
+    if (!columnList.length && rows.length) {
+        columnList = Object.keys(rows[0]);
+    }
+
+    const headerCells = columnList.map(col => `<th>${escapeHtml(col)}</th>`).join('');
+    const bodyRows = rows
+        .map(row => {
+            const cells = columnList.map(col => `<td>${escapeHtml(row[col])}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+        })
+        .join('');
+
+    return `
+        <div class="query-table-wrapper">
+            <table class="query-table">
+                <thead><tr>${headerCells}</tr></thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // Progress Details Modal Functions

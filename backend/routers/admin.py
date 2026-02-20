@@ -7,8 +7,7 @@ import logging
 import os
 
 from ..database import db
-# NL_QUERY functionality disabled - unused schema imports commented out
-# from ..schemas import AdminQueryRequest, AdminQueryResponse, GameAttendee
+from ..schemas import AdminQueryRequest, AdminQueryResponse
 import select_ai
 from ..config import config
 from ..services import onboarding as onboarding_service
@@ -50,9 +49,9 @@ async def get_all_attendees(
     intro_lt: Optional[int] = Query(None, description="Filter attendees with intro completed count <= x"),
     onboarding_lt: Optional[int] = Query(None, description="Filter attendees with onboarding tasks completed <= x"),
     survey_lt: Optional[int] = Query(None, description="Filter attendees with surveys completed <= x"),
-    ack_filter: Optional[str] = Query(None, regex="^(Y|N|any)$", description="Filter by ACK (Y, N, or any)"),
+    ack_filter: Optional[str] = Query(None, pattern="^(Y|N|any)$", description="Filter by ACK (Y, N, or any)"),
     sort_by: Optional[str] = Query("name", description="Sort by field: name, location, overall_progress, intro_completed, onboarding_completed, surveys_completed"),
-    order: Optional[str] = Query("asc", regex="^(asc|desc)$", description="Sort order: asc or desc")
+    order: Optional[str] = Query("asc", pattern="^(asc|desc)$", description="Sort order: asc or desc")
 ):
     """
     Get all attendees with calculated progress for admin dashboard, supporting filters and sorting.
@@ -225,41 +224,49 @@ async def get_all_attendees(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-# NL_QUERY functionality disabled - natural language query endpoints commented out
-# @router.post("/query", response_model=AdminQueryResponse)
-# async def execute_natural_language_query(query_request: AdminQueryRequest):
-#     """
-#     Execute natural language query using Oracle SELECT AI.
-#     """
-#     try:
-#         # Get the SELECT AI profile
-#         profile = get_select_ai_profile()
+@router.post("/query", response_model=AdminQueryResponse)
+async def execute_natural_language_query(query_request: AdminQueryRequest):
+    """
+    Execute natural language query using Oracle SELECT AI.
+    """
+    try:
+        # Get the SELECT AI profile
+        profile = get_select_ai_profile()
 
-#         # Execute the natural language query
-#         df = profile.run_sql(prompt=query_request.query)
+        sql_text = None
+        try:
+            sql_text = profile.show_sql(prompt=query_request.query)
+        except Exception as exc:
+            logger.warning("Unable to show SQL for query '%s': %s", query_request.query, exc)
 
-#         # Convert DataFrame to list of dictionaries
-#         results = []
-#         if not df.empty:
-#             results = df.to_dict('records')
+        # Execute the natural language query
+        df = profile.run_sql(prompt=query_request.query)
 
-#         # Generate a summary based on the results
-#         if df.empty:
-#             summary = "No results found for the query"
-#         else:
-#             num_rows = len(df)
-#             num_cols = len(df.columns)
-#             summary = f"Found {num_rows} result{'s' if num_rows != 1 else ''} with {num_cols} column{'s' if num_cols != 1 else ''}"
+        # Convert DataFrame to list of dictionaries
+        results = []
+        if not df.empty:
+            results = df.to_dict('records')
 
-#         return AdminQueryResponse(
-#             query=query_request.query,
-#             results=results,
-#             summary=summary
-#         )
+        # Generate a summary based on the results
+        if df.empty:
+            summary = "No results found for the query"
+        else:
+            num_rows = len(df)
+            num_cols = len(df.columns)
+            summary = f"Found {num_rows} result{'s' if num_rows != 1 else ''} with {num_cols} column{'s' if num_cols != 1 else ''}"
 
-#     except Exception as e:
-#         logger.error(f"Error executing natural language query '{query_request.query}': {e}")
-#         raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
+        return AdminQueryResponse(
+            query=query_request.query,
+            sql=sql_text,
+            columns=list(df.columns) if not df.empty else [],
+            results=results,
+            row_count=len(df),
+            summary=summary,
+        )
+
+    except Exception as e:
+        logger.error(f"Error executing natural language query '{query_request.query}': {e}")
+        raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
 
 
 @router.get("/locations")

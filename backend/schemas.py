@@ -39,6 +39,19 @@ class AdminUser(BaseModel):
     is_active: bool = True
 
 
+class AdminQueryRequest(BaseModel):
+    query: str
+
+
+class AdminQueryResponse(BaseModel):
+    query: str
+    sql: Optional[str] = None
+    columns: List[str] = []
+    results: List[dict] = []
+    row_count: int = 0
+    summary: str
+
+
 # ---------------------------------------------------------------------------
 # Cohorts & Attendees
 # ---------------------------------------------------------------------------

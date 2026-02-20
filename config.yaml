@@ -1,22 +1,22 @@
 # AI Workshop Companion Configuration
 database:
-  wallet: ${ORACLE_WALLET}
-  wallet_pass: ${ORACLE_WALLET_PASS}
-  user: ${ORACLE_USER}
-  password: ${ORACLE_PASSWORD}
-  dsn: ${ORACLE_DSN}
-  select_ai_profile: ${ORACLE_SELECT_AI_PROFILE:workshop_app_profile}
+  wallet: $ORACLE_WALLET
+  wallet_pass: $ORACLE_WALLET_PASS
+  user: $ORACLE_USER
+  password: $ORACLE_PASSWORD
+  dsn: $ORACLE_DSN
+  select_ai_profile: $ORACLE_SELECT_AI_PROFILE|workshop_app_profile
 
 app:
-  debug: ${DEBUG:false}
-  secret_key: ${SECRET_KEY:your-secret-key-change-in-production}
-  reset_schema_on_startup: ${RESET_SCHEMA_ON_STARTUP:false}
-  reset_data_on_startup: ${RESET_DATA_ON_STARTUP:false}
+  debug: $DEBUG|false
+  secret_key: $SECRET_KEY|your-secret-key-change-in-production
+  reset_schema_on_startup: $RESET_SCHEMA_ON_STARTUP|false
+  reset_data_on_startup: $RESET_DATA_ON_STARTUP|false
 
 proxy:
-  enabled: ${PROXY_ENABLED:false}
-  prefix: ${PROXY_PREFIX:/workshop-app}
-  bearer_token: ${PROXY_BEARER_TOKEN}
+  enabled: $PROXY_ENABLED|false
+  prefix: $PROXY_PREFIX|/workshop-app
+  bearer_token: $PROXY_BEARER_TOKEN
 
 page_sections:
   intro:

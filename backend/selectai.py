@@ -40,24 +40,32 @@ def main():
 
         # Example queries demonstrating student profile capabilities
         queries = [
-            "Show me all student profiles with their names and locations",
-            "How many students are from Austin?",
-            "List students who have completed their team introductions",
-            "What are the different teams and how many students are in each?",
-            "Show me students with their introduction text",
-            "How many students have acknowledged the workshop?",
-            "List students by location and show their team information"
+            "how many students are there",
+            "give me name, email & manageres nae of students that have not yet acknowledegde the workshop",
+            "ofr each onboarding step, give me teh step detail and number of students that have completed it ",
+            "how many test users are there ?",
+            "who are the admins",
+            "how many studensta have 2TL info filled",
         ]
 
         print("\nRunning example queries...\n")
 
-        for i, query in enumerate(queries, 1):
-            print(f"{i}. {query}")
-            print("-" * 40)
+        separator = "-" * 40
+        for query in queries:
+            print(separator)
+            print(f"Query: {query}")
             try:
+                try:
+                    sql_text = profile.show_sql(prompt=query)
+                    if sql_text:
+                        print("SQL:")
+                        print(sql_text)
+                        print(separator)
+                except Exception as sql_exc:
+                    print(f"Could not generate SQL: {sql_exc}")
                 df = profile.run_sql(prompt=query)
                 print(f"Columns: {list(df.columns)}")
-                print(f"Results ({len(df)} rows):")
+                print(f"Results: {len(df)} rows")
                 print(df.to_string(index=False))
             except Exception as e:
                 print(f"Error executing query: {e}")
