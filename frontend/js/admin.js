@@ -510,6 +510,7 @@ function renderIntroCharts(intro) {
         const totalCompleted = truthQuestions.reduce((sum, q) => sum + (q.completed || 0), 0);
         const totalTotal = truthQuestions.reduce((sum, q) => sum + (q.total || 0), 0);
         const summaryItem = {
+            code: 'truth_summary',
             label: 'Two Truths & One Lie (All Prompts)',
             completed: totalCompleted,
             total: totalTotal
@@ -519,65 +520,6 @@ function renderIntroCharts(intro) {
         const container = document.getElementById('truth-summary-chart');
         if (container) container.innerHTML = '<p>No truth prompts configured.</p>';
     }
-}
-
-// Simple progress chart renderer - no Chart.js dependency
-function renderSimpleProgressChart(containerId, items) {
-    const container = document.getElementById(containerId);
-    if (!container || !Array.isArray(items) || !items.length) {
-        if (container) container.innerHTML = '';
-        return;
-    }
-
-    const html = items.map(item => {
-        // Check if this is a choice question with breakdown data
-        if (item.breakdown && Array.isArray(item.breakdown) && item.breakdown.length > 0) {
-            // Render choice breakdown
-            const choiceHtml = item.breakdown.map(choice => {
-                const count = choice.count || 0;
-                const total = item.completed || item.breakdown.reduce((sum, c) => sum + (c.count || 0), 0);
-                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-                const label = choice.label || choice.value || 'Unknown';
-
-                return `
-                    <div class="choice-breakdown-item">
-                        <div class="choice-breakdown-label">${label}</div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill" style="width: ${percentage}%"></div>
-                        </div>
-                        <div class="progress-stats">${count}/${total} (${percentage}%)</div>
-                    </div>
-                `;
-            }).join('');
-
-            return `
-                <div class="progress-item choice-question">
-                    <div class="progress-label">${item.label || item.code || 'Unknown'}</div>
-                    <div class="choice-breakdown-container">
-                        ${choiceHtml}
-                    </div>
-                </div>
-            `;
-        } else {
-            // Render simple progress bar for text questions
-            const completed = item.completed || 0;
-            const total = item.total || 1;
-            const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-            const label = item.label || item.code || 'Unknown';
-
-            return `
-                <div class="progress-item">
-                    <div class="progress-label">${label}</div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar-fill" style="width: ${percentage}%"></div>
-                    </div>
-                    <div class="progress-stats">${completed}/${total} (${percentage}%)</div>
-                </div>
-            `;
-        }
-    }).join('');
-
-    container.innerHTML = html;
 }
 
 // Simple choice breakdown renderer for device preferences and t-shirt sizes

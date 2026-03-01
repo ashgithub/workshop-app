@@ -648,6 +648,50 @@ async def get_intro_question_details(
     For choice questions, also break down by answer options.
     """
     try:
+        include_flag = 1 if include_test else 0
+
+        if question_code == "truth_summary":
+            attendees = db.execute_query("""
+                SELECT
+                    a.FULL_NAME,
+                    a.EMAIL,
+                    (
+                        MAX(CASE WHEN iq.CODE = 'truth_1' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END) +
+                        MAX(CASE WHEN iq.CODE = 'truth_2' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END) +
+                        MAX(CASE WHEN iq.CODE = 'truth_3' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END)
+                    ) AS truth_count
+                FROM ATTENDEES a
+                LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID
+                LEFT JOIN INTRO_QUESTIONS iq ON iq.ID = r.QUESTION_ID AND iq.CODE IN ('truth_1', 'truth_2', 'truth_3')
+                WHERE a.COHORT_ID = :cohort_id
+                  AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
+                GROUP BY a.ID, a.FULL_NAME, a.EMAIL
+                ORDER BY a.FULL_NAME, a.EMAIL
+            """, {"cohort_id": cohort_id, "include_test": include_flag})
+
+            all_participants = []
+            some_participants = []
+            none_participants = []
+
+            for row in attendees or []:
+                participant = {"name": row[0], "email": row[1]}
+                truth_count = int(row[2] or 0)
+                if truth_count == 3:
+                    all_participants.append(participant)
+                elif truth_count in (1, 2):
+                    some_participants.append(participant)
+                else:
+                    none_participants.append(participant)
+
+            return {
+                "question": {"code": question_code, "type": "aggregate"},
+                "tabs": [
+                    {"label": "All", "participants": all_participants},
+                    {"label": "Some", "participants": some_participants},
+                    {"label": "None", "participants": none_participants},
+                ],
+            }
+
         # Get question details
         question = db.execute_query("""
             SELECT ID, QUESTION_TYPE, CONFIG
@@ -659,7 +703,6 @@ async def get_intro_question_details(
             raise HTTPException(status_code=404, detail="Question not found")
 
         question_id, question_type, config_str = question[0]
-        include_flag = 1 if include_test else 0
 
         result = {"question": {"code": question_code, "type": question_type}, "tabs": []}
 
