@@ -145,6 +145,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem('cohort_id', data.cohort_id);
                 }
 
+                // Unified auth session (single source of truth for frontend auth state)
+                const authSession = {
+                    user_id: data.user_id,
+                    role: data.is_admin ? 'admin' : 'attendee',
+                    admin_token: data.is_admin ? adminPassword : null,
+                    issued_at: Date.now(),
+                };
+                localStorage.setItem('auth_session', JSON.stringify(authSession));
+
                 // Store/clear admin auth token used by protected admin APIs
                 if (data.is_admin) {
                     localStorage.setItem('ADMIN_AUTH', JSON.stringify(adminPassword));

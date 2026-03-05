@@ -49,11 +49,12 @@ async function apiFetch(path, options = {}) {
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
+    const session = getAuthSession();
+    const adminToken = (session && session.admin_token) || recall('ADMIN_AUTH', null);
     // ADMIN: Add X-Admin-Auth header for all /api/admin/ requests if available
     if (path.startsWith('api/admin')) {
-        const adminAuth = recall('ADMIN_AUTH', null);
-        if (adminAuth) {
-            headers.set('X-Admin-Auth', adminAuth);
+        if (adminToken) {
+            headers.set('X-Admin-Auth', adminToken);
         }
     }
 
@@ -74,7 +75,7 @@ async function apiFetch(path, options = {}) {
 
         // ADMIN: If API returns 401 Unauthorized for /api/admin/, clear auth and redirect to login
         if (path.startsWith('api/admin') && response.status === 401) {
-            localStorage.removeItem('ADMIN_AUTH');
+            clearAuthSession();
             alert('Your session has expired or you are not authorized. Please log in again.');
             location.href = 'index.html';
             throw new Error('Unauthorized admin API access');
@@ -105,11 +106,28 @@ function recall(key, defaultValue = null) {
     }
 }
 
+function getAuthSession() {
+    return recall('auth_session', null);
+}
+
+function clearAuthSession() {
+    localStorage.removeItem('auth_session');
+    localStorage.removeItem('ADMIN_AUTH');
+    localStorage.removeItem('is_admin');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('cohort_id');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ADMIN AUTH CHECK: Redirect to login if not authenticated ---
-    const adminAuth = recall('ADMIN_AUTH', null);
-    const isAdmin = recall('is_admin', false);
-    if (!adminAuth || !isAdmin) {
+    const session = getAuthSession();
+    const legacyAdminAuth = recall('ADMIN_AUTH', null);
+    const legacyIsAdmin = recall('is_admin', false);
+    const effectiveIsAdmin = session ? session.role === 'admin' : legacyIsAdmin;
+    const effectiveAdminAuth = session ? session.admin_token : legacyAdminAuth;
+
+    if (!effectiveAdminAuth || !effectiveIsAdmin) {
+        clearAuthSession();
         location.href = 'index.html'; // Or your actual login page
         return;
     }
