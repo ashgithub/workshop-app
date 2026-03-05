@@ -108,7 +108,8 @@ function recall(key, defaultValue = null) {
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ADMIN AUTH CHECK: Redirect to login if not authenticated ---
     const adminAuth = recall('ADMIN_AUTH', null);
-    if (!adminAuth) {
+    const isAdmin = recall('is_admin', false);
+    if (!adminAuth || !isAdmin) {
         location.href = 'index.html'; // Or your actual login page
         return;
     }

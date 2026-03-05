@@ -14,7 +14,6 @@ from ..services import onboarding as onboarding_service
 from ..services import dashboard as dashboard_service
 from fastapi import Depends, Request
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # Dependency to enforce admin authentication via header

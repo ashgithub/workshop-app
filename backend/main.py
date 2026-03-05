@@ -4,10 +4,9 @@ Main FastAPI application for AI Workshop Companion system.
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
 # Add the parent directory to sys.path so we can import from backend
 parent_dir = Path(__file__).parent.parent
@@ -80,7 +79,7 @@ app = FastAPI(
 
 # --- START No-Cache Middleware for sensitive HTML entrypoints ---
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp
 
 class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
     TARGET_PATHS = {"/admin.html", "/attendee.html", "/index.html"}

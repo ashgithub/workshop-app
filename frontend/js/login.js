@@ -145,6 +145,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem('cohort_id', data.cohort_id);
                 }
 
+                // Store/clear admin auth token used by protected admin APIs
+                if (data.is_admin) {
+                    localStorage.setItem('ADMIN_AUTH', JSON.stringify(adminPassword));
+                } else {
+                    localStorage.removeItem('ADMIN_AUTH');
+                }
+
                 // Redirect based on user type
                 if (data.is_admin) {
                     window.location.href = 'admin.html';
