@@ -12,9 +12,21 @@ import select_ai
 from ..config import config
 from ..services import onboarding as onboarding_service
 from ..services import dashboard as dashboard_service
+from fastapi import Depends, Request
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Dependency to enforce admin authentication via header
+def is_admin_authenticated(request: Request):
+    # Require an HTTP header X-Admin-Auth with the configured admin_shared_password
+    auth = request.headers.get("X-Admin-Auth")
+    if not auth or auth != config.admin_shared_password:
+        raise HTTPException(status_code=401, detail="Unauthorized admin API access")
+    return True
+
+# Add dependency globally to all admin endpoints
+router = APIRouter(dependencies=[Depends(is_admin_authenticated)])
 
 # Global SELECT AI profile instance
 _select_ai_profile = None
