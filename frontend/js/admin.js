@@ -49,6 +49,13 @@ async function apiFetch(path, options = {}) {
     if (config.bearerToken && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${config.bearerToken}`);
     }
+    // ADMIN: Add X-Admin-Auth header for all /api/admin/ requests if available
+    if (path.startsWith('api/admin')) {
+        const adminAuth = recall('ADMIN_AUTH', null);
+        if (adminAuth) {
+            headers.set('X-Admin-Auth', adminAuth);
+        }
+    }
 
     const method = (options.method || 'GET').toUpperCase();
     const startedAt = performance?.now ? performance.now() : Date.now();
@@ -64,6 +71,15 @@ async function apiFetch(path, options = {}) {
             ok: response.ok,
             elapsedMs: Math.round(elapsedMs),
         });
+
+        // ADMIN: If API returns 401 Unauthorized for /api/admin/, clear auth and redirect to login
+        if (path.startsWith('api/admin') && response.status === 401) {
+            localStorage.removeItem('ADMIN_AUTH');
+            alert('Your session has expired or you are not authorized. Please log in again.');
+            location.href = 'index.html';
+            throw new Error('Unauthorized admin API access');
+        }
+
         return response;
     } catch (error) {
         const elapsedMs = (performance?.now ? performance.now() : Date.now()) - startedAt;
@@ -90,6 +106,12 @@ function recall(key, defaultValue = null) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // --- ADMIN AUTH CHECK: Redirect to login if not authenticated ---
+    const adminAuth = recall('ADMIN_AUTH', null);
+    if (!adminAuth) {
+        location.href = 'index.html'; // Or your actual login page
+        return;
+    }
     await loadRuntimeConfig();
     attachTabs();
     initializeProgressTab();
