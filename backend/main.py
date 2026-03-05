@@ -4,8 +4,7 @@ Main FastAPI application for AI Workshop Companion system.
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -78,6 +77,27 @@ app = FastAPI(
     debug=config.debug,
     lifespan=lifespan
 )
+
+# --- START No-Cache Middleware for sensitive HTML entrypoints ---
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+class NoCacheHTMLMiddleware(BaseHTTPMiddleware):
+    TARGET_PATHS = {"/admin.html", "/attendee.html", "/index.html"}
+    def __init__(self, app: ASGIApp):
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path")
+        response = await call_next(request)
+        if path in self.TARGET_PATHS and response.headers.get("content-type", "").startswith("text/html"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(NoCacheHTMLMiddleware)
+# --- END No-Cache Middleware ---
 
 # Configure CORS
 app.add_middleware(
