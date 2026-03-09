@@ -261,7 +261,7 @@ def _count_onboarding_responses(question_id: int, cohort_id: int, include_flag: 
         WHERE r.QUESTION_ID = :question_id
           AND a.COHORT_ID = :cohort_id
           AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
-          AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+          AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y'
         """,
         {
             "question_id": question_id,

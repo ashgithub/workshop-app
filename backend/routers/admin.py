@@ -125,7 +125,7 @@ async def get_all_attendees(
             SELECT
                 ATTENDEE_ID,
                 COUNT(*) as total_count,
-                COUNT(CASE WHEN RESPONSE IS NOT NULL AND LENGTH(TRIM(RESPONSE)) > 0 THEN 1 END) as completed_count
+                COUNT(CASE WHEN TRIM(DBMS_LOB.SUBSTR(RESPONSE, 4000, 1)) = 'Y' THEN 1 END) as completed_count
             FROM ATTENDEE_ONBOARDING_RESPONSES
             GROUP BY ATTENDEE_ID
         ) oq_progress ON a.ID = oq_progress.ATTENDEE_ID
@@ -667,9 +667,9 @@ async def get_intro_question_details(
                     a.FULL_NAME,
                     a.EMAIL,
                     (
-                        MAX(CASE WHEN iq.CODE = 'truth_1' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END) +
-                        MAX(CASE WHEN iq.CODE = 'truth_2' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END) +
-                        MAX(CASE WHEN iq.CODE = 'truth_3' AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 ELSE 0 END)
+                        MAX(CASE WHEN iq.CODE = 'truth_1' AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y' THEN 1 ELSE 0 END) +
+                        MAX(CASE WHEN iq.CODE = 'truth_2' AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y' THEN 1 ELSE 0 END) +
+                        MAX(CASE WHEN iq.CODE = 'truth_3' AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y' THEN 1 ELSE 0 END)
                     ) AS truth_count
                 FROM ATTENDEES a
                 LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID
@@ -741,7 +741,7 @@ async def get_intro_question_details(
                     WHERE r.QUESTION_ID = :question_id
                       AND a.COHORT_ID = :cohort_id
                       AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
-                      AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+                      AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y'
                     ORDER BY response_value
                 """, {
                     "cohort_id": cohort_id,
@@ -789,7 +789,7 @@ async def get_intro_question_details(
                 LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
                 WHERE a.COHORT_ID = :cohort_id
                   AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
-                  AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+                  AND (r.RESPONSE IS NULL OR TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) != 'Y')
                 ORDER BY a.FULL_NAME
             """, {
                 "cohort_id": cohort_id,
@@ -813,7 +813,7 @@ async def get_intro_question_details(
                 WHERE a.COHORT_ID = :cohort_id
                   AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
                   AND r.QUESTION_ID = :question_id
-                  AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+                  AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y'
                 ORDER BY a.FULL_NAME
             """, {
                 "cohort_id": cohort_id,
@@ -827,7 +827,7 @@ async def get_intro_question_details(
                 LEFT JOIN ATTENDEE_INTRO_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
                 WHERE a.COHORT_ID = :cohort_id
                   AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
-                  AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+                  AND (r.RESPONSE IS NULL OR TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) != 'Y')
                 ORDER BY a.FULL_NAME
             """, {
                 "cohort_id": cohort_id,
@@ -856,7 +856,7 @@ async def get_onboarding_question_details(
     include_test: bool = False
 ):
     """
-    Get detailed participant lists for an onboarding question (completed vs not completed).
+    Get detailed participant lists for an onboarding question (Y vs not Y).
     """
     try:
         include_flag = 1 if include_test else 0
@@ -871,7 +871,7 @@ async def get_onboarding_question_details(
 
         question_id = question_result[0][0]
 
-        # Get completed participants
+        # Get Y participants
         completed = db.execute_query("""
             SELECT a.FULL_NAME, a.EMAIL
             FROM ATTENDEES a
@@ -879,7 +879,7 @@ async def get_onboarding_question_details(
             WHERE a.COHORT_ID = :cohort_id
               AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
               AND r.QUESTION_ID = :question_id
-              AND r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0
+              AND TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y'
             ORDER BY a.FULL_NAME
         """, {
             "cohort_id": cohort_id,
@@ -887,14 +887,14 @@ async def get_onboarding_question_details(
             "question_id": question_id
         })
 
-        # Get not completed participants
+        # Get not-Y participants, including N, blank, null, or missing rows
         not_completed = db.execute_query("""
             SELECT a.FULL_NAME, a.EMAIL
             FROM ATTENDEES a
             LEFT JOIN ATTENDEE_ONBOARDING_RESPONSES r ON r.ATTENDEE_ID = a.ID AND r.QUESTION_ID = :question_id
             WHERE a.COHORT_ID = :cohort_id
               AND (:include_test = 1 OR NVL(a.IS_TEST, 'N') = 'N')
-              AND (r.RESPONSE IS NULL OR LENGTH(TRIM(r.RESPONSE)) = 0)
+              AND (r.RESPONSE IS NULL OR TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) != 'Y')
             ORDER BY a.FULL_NAME
         """, {
             "cohort_id": cohort_id,
@@ -905,8 +905,8 @@ async def get_onboarding_question_details(
         return {
             "question": {"type": "onboarding", "code": question_code},
             "tabs": [
-                {"label": "Completed", "participants": [{"name": row[0], "email": row[1]} for row in (completed or [])]},
-                {"label": "Not Completed", "participants": [{"name": row[0], "email": row[1]} for row in (not_completed or [])]}
+                {"label": "Y", "participants": [{"name": row[0], "email": row[1]} for row in (completed or [])]},
+                {"label": "Not Y", "participants": [{"name": row[0], "email": row[1]} for row in (not_completed or [])]}
             ]
         }
 

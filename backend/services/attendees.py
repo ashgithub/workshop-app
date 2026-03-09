@@ -52,7 +52,7 @@ def get_progress(attendee_id: int) -> dict:
         """
         SELECT
             COUNT(*) AS total_questions,
-            COUNT(CASE WHEN r.RESPONSE IS NOT NULL AND LENGTH(TRIM(r.RESPONSE)) > 0 THEN 1 END) AS answered
+            COUNT(CASE WHEN TRIM(DBMS_LOB.SUBSTR(r.RESPONSE, 4000, 1)) = 'Y' THEN 1 END) AS answered
         FROM ONBOARDING_QUESTIONS q
         LEFT JOIN ATTENDEE_ONBOARDING_RESPONSES r
             ON r.QUESTION_ID = q.ID AND r.ATTENDEE_ID = :attendee_id
