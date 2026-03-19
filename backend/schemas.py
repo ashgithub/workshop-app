@@ -204,7 +204,6 @@ class SurveyQuestion(BaseModel):
     options: Optional[str] = None
     display_order: int = 0
     required: bool = True
-    help_text: Optional[str] = None
 
 
 class SurveyQuestionCreate(BaseModel):
@@ -213,7 +212,6 @@ class SurveyQuestionCreate(BaseModel):
     options: Optional[str] = None
     display_order: int = 0
     required: bool = True
-    help_text: Optional[str] = None
 
 
 class SurveySubmission(BaseModel):

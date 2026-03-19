@@ -6,6 +6,15 @@ from typing import List, Optional
 from backend.database import db
 
 
+def _normalize_lob(value):
+    if value is None:
+        return None
+    read = getattr(value, "read", None)
+    if callable(read):
+        return read()
+    return value
+
+
 def list_templates(active_only: bool = True) -> List[dict]:
     query = """
     SELECT ID, NAME, SLUG, DESCRIPTION, DISPLAY_ORDER, ACTIVE
@@ -31,7 +40,7 @@ def list_templates(active_only: bool = True) -> List[dict]:
 def list_questions(template_id: int) -> List[dict]:
     rows = db.execute_query(
         """
-        SELECT ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED, HELP_TEXT
+        SELECT ID, PROMPT, QUESTION_TYPE, OPTIONS, DISPLAY_ORDER, REQUIRED
         FROM SURVEY_QUESTIONS
         WHERE TEMPLATE_ID = :template_id
         ORDER BY DISPLAY_ORDER
@@ -43,24 +52,42 @@ def list_questions(template_id: int) -> List[dict]:
             "id": row[0],
             "prompt": row[1],
             "question_type": row[2],
-            "options": row[3],
+            "options": _normalize_lob(row[3]),
             "display_order": row[4],
             "required": row[5] == 'Y',
-            "help_text": row[6],
         }
         for row in rows
     ]
 
 
 def record_submission(attendee_id: int, template_id: int, answers: List[dict]) -> int:
-    submission_id = db.execute_returning(
+    existing = db.fetch_one(
         """
-        INSERT INTO SURVEY_SUBMISSIONS (ATTENDEE_ID, TEMPLATE_ID)
-        VALUES (:attendee_id, :template_id)
-        RETURNING ID INTO :out_id
+        SELECT ID
+        FROM SURVEY_SUBMISSIONS
+        WHERE ATTENDEE_ID = :attendee_id AND TEMPLATE_ID = :template_id
         """,
         {"attendee_id": attendee_id, "template_id": template_id},
     )
+
+    if existing:
+        submission_id = existing[0]
+        db.execute_dml(
+            """
+            DELETE FROM SURVEY_ANSWERS
+            WHERE SUBMISSION_ID = :submission_id
+            """,
+            {"submission_id": submission_id},
+        )
+    else:
+        submission_id = db.execute_returning(
+            """
+            INSERT INTO SURVEY_SUBMISSIONS (ATTENDEE_ID, TEMPLATE_ID)
+            VALUES (:attendee_id, :template_id)
+            RETURNING ID INTO :out_id
+            """,
+            {"attendee_id": attendee_id, "template_id": template_id},
+        )
 
     for answer in answers:
         db.execute_dml(
@@ -101,5 +128,5 @@ def get_submission(attendee_id: int, template_id: int) -> Optional[dict]:
     return {
         "submission_id": submission[0],
         "submitted_at": submission[1].isoformat() if submission[1] else None,
-        "answers": [{"question_id": row[0], "response": row[1]} for row in answers],
+        "answers": [{"question_id": row[0], "response": _normalize_lob(row[1])} for row in answers],
     }
